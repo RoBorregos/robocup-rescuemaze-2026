@@ -15,9 +15,13 @@ VL53L0X sensorRight;
 
 volatile uint32_t tiempoA = 0;
 volatile uint32_t tiempoB = 0;
+volatile uint32_t distL = 0;
+volatile uint32_t distR = 0;
+
 volatile bool listoA = false;
 volatile bool listoB = false;
-
+volatile bool readyToSync = false;
+SemaphoreHandle_t syncSemaphore;
 
 void initVL53L0X(VL53L0X &sensor, TwoWire &wireBus, uint8_t xshutPin, uint8_t address = 0x29) {
   digitalWrite(xshutPin, LOW);
@@ -31,7 +35,8 @@ void initVL53L0X(VL53L0X &sensor, TwoWire &wireBus, uint8_t xshutPin, uint8_t ad
   for (int attempt = 1; attempt <= 3; attempt++) {
     if (sensor.init()) {
       sensor.setTimeout(500);
-      sensor.setMeasurementTimingBudget(50000);
+      sensor.setMeasurementTimingBudget(33000);
+      sensor.startContinuous(33);
       if (address != 0x29) {
         sensor.setAddress(address);
         delay(100); 
@@ -57,12 +62,13 @@ void initVL53L0X(VL53L0X &sensor, TwoWire &wireBus, uint8_t xshutPin, uint8_t ad
   
   Serial.println(" INICIALIZACIÓN FALLIDA ");
 }
-int readVL53L0X(VL53L0X &sensor, TwoWire &wireBus, uint8_t address, const char* name) {
+
+int readVL53L0X(VL53L0X &sensor, TwoWire &wireBus, uint8_t address, const char* name) 
+{
   static int errorCount[2] = {0, 0};
   int sensorIndex = (strcmp(name, "LEFT") == 0) ? 0 : 1;
   
-
-  int dist = sensor.readRangeSingleMillimeters();
+  int dist = sensor.readRangeContinuousMillimeters();
   
   if (sensor.timeoutOccurred()) {
     errorCount[sensorIndex]++;
@@ -88,61 +94,72 @@ int readVL53L0X(VL53L0X &sensor, TwoWire &wireBus, uint8_t address, const char* 
   return dist;
 }
 
-void taskLeft(void *pv) {
-  Serial.println("[LEFT] Task en Core 1 ");
-  
+void taskLeft(void *pv)
+{
+  while (true)
+  {
+    xSemaphoreTake(syncSemaphore, portMAX_DELAY);
+    distL = readVL53L0X(sensorLeft, Wire1, 0x29, "LEFT");
+    tiempoA = esp_timer_get_time();
+    listoA = true;
 
-  vTaskDelay(pdMS_TO_TICKS(1000));
-  
-  while (true) {
-    int dist = readVL53L0X(sensorLeft, Wire1, 0x29, "LEFT");
-    
-    if (dist > 0 && dist < 2000) { 
-      tiempoA = millis();
-      listoA = true;
-      
-      Serial.print("[LEFT-C1] ");
-      Serial.print(dist);
-      Serial.println(" mm");
-    } else if (dist != -1) {
-      Serial.print("[LEFT] : ");
-      Serial.println(dist);
-    }
-    
-    vTaskDelay(pdMS_TO_TICKS(60));
-  }
-}
-void taskRight(void *pv) {
-  Serial.println("[RIGHT] Task en Core 0 ");
-  
-  while (true) {
-    int dist = readVL53L0X(sensorRight, Wire, 0x31, "RIGHT");
-    
-    if (dist > 0 && dist < 2000) { 
-      tiempoB = millis();
-      listoB = true;
-      
-      Serial.print("[RIGHT-C0] ");
-      Serial.print(dist);
-      Serial.println(" mm");
-      if (listoA && listoB) {
-        uint32_t dt = abs((int32_t)tiempoA - (int32_t)tiempoB);
-        Serial.print("[DIF] ");
-        Serial.print(dt);
-        Serial.println(" ms");
-        listoA = listoB = false;
-      }
-    }
-    
-    vTaskDelay(pdMS_TO_TICKS(60));
+    xSemaphoreGive(syncSemaphore);
+    vTaskDelay(pdMS_TO_TICKS(20));
   }
 }
 
 
-void setup() {
+void taskRight(void *pv)
+{
+  while (true)
+  {
+    xSemaphoreTake(syncSemaphore, portMAX_DELAY);
+    distR = readVL53L0X(sensorRight, Wire, 0x31, "RIGHT");
+
+    tiempoB = esp_timer_get_time();
+    listoB = true;
+
+    xSemaphoreGive(syncSemaphore);
+    vTaskDelay(pdMS_TO_TICKS(20));
+  }
+}
+
+void printDiff(void *pv)
+{
+  while (true)
+  {
+    xSemaphoreTake(syncSemaphore, portMAX_DELAY);
+    Serial.print("[LEFT-C1] ");
+    Serial.print(distL);
+    
+    Serial.print("[RIGHT-C0] ");
+    Serial.print(distR);
+
+    if (listoA && listoB) 
+    {
+      uint32_t dt = abs((int32_t)tiempoA - (int32_t)tiempoB);
+      Serial.print("[DIF] ");
+      Serial.print(dt);
+      Serial.println(" us");
+      listoA = listoB = false;
+    }
+    xSemaphoreGive(syncSemaphore);
+    vTaskDelay(pdMS_TO_TICKS(20));
+  }
+}
+
+void setup() 
+{
   Serial.begin(115200);
   delay(5000);
   
+  syncSemaphore = xSemaphoreCreateMutex();
+  
+  if (syncSemaphore == NULL) 
+  {
+    Serial.println("ERROR: Failed to create semaphore!");
+    while(1); // Stop here
+  }
 
   pinMode(XSHUT_LEFT, OUTPUT);
   pinMode(XSHUT_RIGHT, OUTPUT);
@@ -172,20 +189,26 @@ void setup() {
 
   
   Serial.print("LEFT: ");
-  int leftTest = sensorLeft.readRangeSingleMillimeters();
+  int leftTest = sensorLeft.readRangeContinuousMillimeters();
   if (!sensorLeft.timeoutOccurred()) {
     Serial.print(leftTest);
     Serial.println(" mm ");
-  } else {
+  } 
+  else 
+  {
     Serial.println("TIMEOUT ");
   }
   
   Serial.print("RIGHT: ");
-  int rightTest = sensorRight.readRangeSingleMillimeters();
-  if (!sensorRight.timeoutOccurred()) {
+  int rightTest = sensorRight.readRangeContinuousMillimeters();
+  if (!sensorRight.timeoutOccurred()) 
+  {
     Serial.print(rightTest);
     Serial.println(" mm ");
-  } else {
+  } 
+  else 
+  {
+    Serial.println("TIMEOUT ");
   }
   
   // Task RIGHT Core 0
@@ -194,7 +217,7 @@ void setup() {
     "TaskRight",
     4096,
     NULL,
-    2,
+    1,
     NULL,
     0
   );
@@ -211,6 +234,16 @@ void setup() {
     NULL,
     1
   );
+
+  xTaskCreatePinnedToCore(
+    printDiff,
+    "PrintDiffs",
+    4096,
+    NULL,
+    2,
+    NULL,
+    0
+  );
   
   Serial.println("bien");
 }
@@ -219,7 +252,8 @@ void loop() {
 
   static unsigned long lastStatus = 0;
   
-  if (millis() - lastStatus > 30000) { // Cada 30 segundos
+  if (millis() - lastStatus > 30000) 
+  { // Cada 30 segundos
 
     Serial.print("LEFT (0x29): ");
     Wire1.beginTransmission(0x29);
@@ -241,7 +275,7 @@ void loop() {
       sensorLeft.init();
       sensorRight.init();
     }
-    
+
     lastStatus = millis();
   }
   
