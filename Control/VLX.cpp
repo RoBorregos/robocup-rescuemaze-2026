@@ -2,9 +2,7 @@
 #include <Arduino.h>
 #include <Wire.h>
 
-SemaphoreHandle_t syncSemaphore;
-QueueHandle_t distanceQueue;
-distanceQueue = xQueueCreate(1, sizeof(float));
+SemaphoreHandle_t i2cSemaphore;
 
 VLX::VLX(){
 }
@@ -14,6 +12,7 @@ VLX::VLX(const uint8_t posMux){
 }
 
 void VLX::begin(){
+    if (i2cSemaphore == NULL) {i2cSemaphore = xSemaphoreCreateMutex();}
     mux_.selectChannel();
     VLX_.begin();
     if (!VLX_.begin()) {
@@ -21,6 +20,14 @@ void VLX::begin(){
         while (1);
     }
     Serial.println("VL53L0X iniciado correctamente.");  
+
+    xTaskCreate(
+        RTOSDistance,
+        "VLX_Task",
+        2048,
+        this,
+        1,
+        &taskHandle);
 }
 
 void VLX::setMux(const uint8_t posMux) {
@@ -33,34 +40,31 @@ void VLX::updateDistance() {
 
 void VLX::RTOSDistance(void *pv)
 {
+    VLX *self = static_cast<VLX*>(pv);
     float dist;
     while (true)
     {
-        xSemaphoreTake(syncSemaphore, portMAX_DELAY);
-        float dist = VLX_.readRangeContinuousMillimeters();
-        xSemaphoreGive(syncSemaphore);
-        dist /= 10;
-        xQueueOverwrite(distanceQueue, &dist);
+        if (xSemaphoreTake(i2cSemaphore, portMAX_DELAY) == pdTRUE)
+        {
+            self->mux_.selectChannel();
+            dist = self->VLX_.readRangeContinuousMillimeters() / 10.0f;
+            xSemaphoreGive(self->i2cSemaphore);
+            xQueueOverwrite(self->distanceQueue, &dist);
+        }
         vTaskDelay(pdMS_TO_TICKS(20));
     }
 }
 
-float VLX::getDistance(){
-    updateDistance();
-    if (measure.RangeStatus != 4) 
+float VLX::getDistance()
+{
+    float distance = lastDistance;
+    if (distanceQueue != NULL)
     {
-    float distance;
-    xQueuePeek(distanceQueue, &distance, portMAX_DELAY);
+        xQueuePeek(distanceQueue, &distance, 0);
+        lastDistance = distance;
+    }
+
     return distance;
-    }
-    else{
-        updateDistance();
-        if (measure.RangeStatus != 4) {
-        float distance;
-        xQueuePeek(distanceQueue, &distance, portMAX_DELAY);
-        return distance;
-        }
-    }
 }
 
 void VLX::printDistance(){
