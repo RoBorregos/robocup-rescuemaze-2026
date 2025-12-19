@@ -3,6 +3,7 @@
 #include <Wire.h>
 
 SemaphoreHandle_t i2cSemaphore;
+static MUX mux;
 
 VLX::VLX(){
 }
@@ -20,64 +21,61 @@ void VLX::begin(){
         while (1);
     }
     Serial.println("VL53L0X iniciado correctamente.");  
-
-    xTaskCreate(
-        RTOSDistance,
-        "VLX_Task",
-        2048,
-        this,
-        1,
-        &taskHandle);
+    VLX_.setMeasurementTimingBudgetMicroSeconds(33000);
+    VLX_.startRanging();
 }
 
-void VLX::setMux(const uint8_t posMux) {
-    mux_.setNewChannel(posMux);
-}
-void VLX::updateDistance() {
-    mux_.selectChannel();
-    VLX_.rangingTest(&measure, false);
-}
-
-void VLX::RTOSDistance(void *pv)
+void VLXTask1(void *pv)
 {
-    VLX *self = static_cast<VLX*>(pv);
-    float dist;
+    VL53L0X_RangingMeasurementData_t measure;
+
     while (true)
     {
-        if (xSemaphoreTake(i2cSemaphore, portMAX_DELAY) == pdTRUE)
+        xSemaphoreTake(i2cSemaphore, portMAX_DELAY);
+
+        for (int i: PriorityTaskID::Task1)
         {
-            self->mux_.selectChannel();
-            dist = self->VLX_.readRangeContinuousMillimeters() / 10.0f;
-            xSemaphoreGive(self->i2cSemaphore);
-            xQueueOverwrite(self->distanceQueue, &dist);
+            mux.selectChannel(i);
+            vlx_hw.rangingTest(&measure, false);
+
+            if (vlx_hw.RangeStatus != 4) 
+            {
+                vlx[i].lastDistance = (float)measure.RangeMilliMeter / 10.0f;
+            }
         }
+        xSemaphoreGive(i2cSemaphore);
         vTaskDelay(pdMS_TO_TICKS(20));
     }
 }
 
-float VLX::getDistance()
+void VLXTask2(void *pv)
 {
-    float distance = lastDistance;
-    if (distanceQueue != NULL)
-    {
-        xQueuePeek(distanceQueue, &distance, 0);
-        lastDistance = distance;
-    }
+    VL53L0X_RangingMeasurementData_t measure;
 
-    return distance;
+    while (true)
+    {
+        xSemaphoreTake(i2cSemaphore, portMAX_DELAY);
+
+        for (int i: PriorityTaskID::Task2)
+        {
+            mux.selectChannel(i);
+            vlx_hw.rangingTest(&measure, false);
+
+            if (vlx_hw.RangeStatus != 4) 
+            {
+                vlx[i].lastDistance = (float)measure.RangeMilliMeter / 10.0f;
+            }
+        }
+        xSemaphoreGive(i2cSemaphore);
+        vTaskDelay(pdMS_TO_TICKS(20));
+    }
 }
 
-void VLX::printDistance(){
-    updateDistance();
-    if (measure.RangeStatus != 4) {
-        Serial.print("Distance: ");
-        Serial.print(measure.RangeMilliMeter);
-        Serial.println(" mm");
-    } else {
-        Serial.println("Fuera de rango.");
-    }
-    delay(500); 
-    }
+float VLX::getDistance() const 
+{
+    return lastDistance;
+}
+
 bool VLX::isWall(){
     if(getDistance()<kDistanceToWall){
         return true;
