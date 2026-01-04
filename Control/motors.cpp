@@ -21,3 +21,20 @@ void motors::PID_selfCenter(uint16_t reference_speed)
     }
     delay(20);
 }
+
+bool motors::rampInFront(){
+    Readings[] readings;
+    
+    if((vlx[vlxID::frontLeft].getDistance()-vlx[vlxID::front].getDistance())>=2){
+    // If we do add a front lower sensors, then: && vlx[vlxID::front].getDistance() < vlx[vlxID::frontCenter].getDistance())
+        for (int i=0;i<3;i++){
+            readings[i]=vlx[vlxID::front].getDistance();
+            delay(20);
+        }
+        if((abs(readings[0]-readings[1])>=2) && (abs(readings[1]-readings[2])>=2) && (abs(readings[0]-readings[2])>=2)){
+            return true;
+        }
+    }else{
+        return false;
+    }
+}

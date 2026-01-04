@@ -24,21 +24,17 @@ void VLX::begin(){
 
 /*example:
 
-void VLX::VLXTask(void *pv)
-{
+void VLX::VLXTask(void *pv){
     VL53L0X_RangingMeasurementData_t measure;
 
-    while (true)
-    {
+    while (true){
         xSemaphoreTake(i2cSemaphore, portMAX_DELAY);
 
-        for (int i: PriorityTaskID::Type tasksID)
-        {
+        for (int i: PriorityTaskID::Type tasksID){
             mux.selectChannel(i);
             vlx_hw.rangingTest(&measure, false);
 
-            if (vlx_hw.RangeStatus != 4) 
-            {
+            if (vlx_hw.RangeStatus != 4) {
                 vlx[i].lastDistance = (float)measure.RangeMilliMeter / 10.0f;
             }
         }

@@ -64,18 +64,16 @@ namespace vlxID{
 
 namespace PriorityTaskID
 {
-    constexpr uint8_t Task1[]
-    {
+    constexpr uint8_t Task1[]{
         vlxID::frontCenter;
         vlxID::front;
         vlxID::frontRight;
         vlxID::frontLeft;
     }
-    constexpr uint8_t Task2[]
-    {
-        vlxID::right,
-        vlxID::left,
-        vlxID::back
+    constexpr uint8_t Task2[]{
+        vlxID::right;
+        vlxID::left;
+        vlxID::back;
     }
 
 }
@@ -96,5 +94,12 @@ namespace rampID{
     constexpr uint8_t kUp=1;
     constexpr uint8_t kDown=2;
     constexpr uint8_t kNone=0;
+}
+
+namespace SelfCenteringID{ //To define
+    constexpr uint8_t kP_Center;
+    constexpr uint8_t kI_Center;
+    constexpr uint8_t kD_Center;
+    constexpr uint8_t CenterTime;
 }
 #endif

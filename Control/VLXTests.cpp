@@ -13,9 +13,7 @@ volatile unsigned long LastTime[Sensors_Amount] = {0};
 volatile unsigned long CurrentTime[Sensors_Amount] = {};
 volatile unsigned long DeltaTime[Sensors_Amount] = {};
 
-void loop() {
-    // Empty since tasks are handling the operations
-}
+void loop() {}
 
 void setup(){
     Serial.begin(115200);
@@ -63,19 +61,15 @@ void VLXTaskPriority1(void *pv)
 {
     VL53L0X_RangingMeasurementData_t measure;
 
-    while (true)
-    {
+    while (true){
         xSemaphoreTake(i2cSemaphore, portMAX_DELAY);
-        for (int i: PriorityTaskID::Task1)
-        {   
+        for (int i: PriorityTaskID::Task1){   
             CurrentTime[i] = esp_timer_get_time();
             mux.selectChannel(Pins::vlxPins[i]);
             sensors[i].rangingTest(&measure, false);
 
-            if (sensors[i].RangeStatus != 4) 
-            {
-                sensors[i].lastDistance = (float)measure.RangeMilliMeter / 10.0f;
-            }
+            if (sensors[i].RangeStatus != 4){
+                sensors[i].lastDistance = (float)measure.RangeMilliMeter / 10.0f;}
             DeltaTime[i] = CurrentTime[i] - LastTime[i];
             LastTime[i] = CurrentTime[i];
         }
@@ -84,20 +78,16 @@ void VLXTaskPriority1(void *pv)
     }
 }
 
-void VLXTaskPriority2(void *pv)
-{
+void VLXTaskPriority2(void *pv){
     VL53L0X_RangingMeasurementData_t measure;
 
-    while (true)
-    {
+    while (true){
         xSemaphoreTake(i2cSemaphore, portMAX_DELAY);
 
-        for (int i: PriorityTaskID::Task2)
-        {
+        for (int i: PriorityTaskID::Task2){
             mux.selectChannel(Pins::vlxPins[i]);
             sensors[i].rangingTest(&measure, false);
-            if (sensors[i].RangeStatus != 4) 
-            {
+            if (sensors[i].RangeStatus != 4) {
                 sensors[i].lastDistance = (float)measure.RangeMilliMeter / 10.0f;
             }
         }
@@ -106,13 +96,10 @@ void VLXTaskPriority2(void *pv)
     }
 }
 
-void PrintDistances(void *pv)
-{
-    while (true)
-    {
+void PrintDistances(void *pv){
+    while (true){
         Serial.println("VLXPriority1 Task:");
-        for (int i: PriorityTaskID::Task1)
-        {
+        for (int i: PriorityTaskID::Task1){
             Serial.print("VLX ID ");
             Serial.print(i);
             Serial.print(": Distance: ");
@@ -124,8 +111,7 @@ void PrintDistances(void *pv)
         }
 
         Serial.println("VLXPriority2 Task:");
-        for (int i: PriorityTaskID::Task2)
-        {
+        for (int i: PriorityTaskID::Task2){
             Serial.print("VLX ID ");
             Serial.print(i);
             Serial.print(": Distance: ");
@@ -135,7 +121,7 @@ void PrintDistances(void *pv)
             Serial.print(DeltaTime[i]);
             Serial.println();
         }
-        Serial.println("-----------------------");
+        Serial.println("------------------------");
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
