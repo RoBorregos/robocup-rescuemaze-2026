@@ -28,12 +28,14 @@ namespace Pins{
         14, 
         33
     };
-    constexpr uint8_t vlxPins[5] = {//MUX
+    constexpr uint8_t vlxPins[7] = {//MUX
         3,  
         4, 
         0, 
         2, 
-        5
+        5, //To define
+        6, 
+        7
     };
     constexpr uint8_t tcsPins[1] = {
         6 
@@ -96,10 +98,4 @@ namespace rampID{
     constexpr uint8_t kNone=0;
 }
 
-namespace SelfCenteringID{ //To define
-    constexpr uint8_t kP_Center;
-    constexpr uint8_t kI_Center;
-    constexpr uint8_t kD_Center;
-    constexpr uint8_t CenterTime;
-}
 #endif
