@@ -4,11 +4,12 @@
             "name": "Mac",
             "includePath": [
                 "${workspaceFolder}/**",
+                "${workspaceFolder}/include",
+                "${workspaceFolder}/src",
                 "${workspaceFolder}/algorithm/include",
                 "${workspaceFolder}/algorithm/src",
                 "${env:HOME}/.platformio/packages/framework-arduino-avr/cores/arduino",
                 "${env:HOME}/.platformio/packages/framework-arduino-avr/variants/standard",
-                "${env:HOME}/.platformio/packages/framework-arduino-avr/libraries/**",
                 "${env:HOME}/.platformio/packages/toolchain-atmelavr/avr/include"
             ],
             "defines": [
@@ -16,7 +17,8 @@
                 "ARDUINO_AVR_UNO",
                 "ARDUINO_ARCH_AVR",
                 "__AVR_ATmega328P__",
-                "F_CPU=16000000L"
+                "F_CPU=16000000L",
+                "__AVR__"
             ],
             "compilerPath": "${env:HOME}/.platformio/packages/toolchain-atmelavr/bin/avr-g++",
             "cStandard": "c11",
