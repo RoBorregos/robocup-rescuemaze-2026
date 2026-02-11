@@ -7,9 +7,6 @@
 #include "BNO.H"
 #include <SPI.h>
 #include <ESP32Servo.h>
-#include "TCS.h"
-#include "LimitSwitch.h"
-#include "Leds.h"
 
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
@@ -39,9 +36,9 @@ private:
     static constexpr uint8_t brakingDis=2;
     static constexpr uint8_t kDistanceToWall=15;
     //wheels
-    static constexpr float wheelDiameter=8.5;
+    static constexpr float wheelDiameter=8.3;
     static constexpr float distancePerRev=wheelDiameter*PI;
-    static constexpr float kTicsPerRev=496.0;
+    static constexpr float kTicsPerRev=500; //496
     static constexpr float kTicsPerTile=30*kTicsPerRev/distancePerRev;
     //Pwm constants
     uint16_t kMinPwmRotate=70;
@@ -50,7 +47,7 @@ private:
     uint16_t kMaxPwmFormard=180;
     //Speeds constants
     static constexpr uint16_t kMinSpeedRotate=7;
-    static constexpr uint16_t kMaxSpeedRotate=30;
+    static constexpr uint16_t kMaxSpeedRotate=20;
     static constexpr uint16_t kMinSpeedFormard=5;
     static constexpr uint16_t kMaxSpeedFormard=40;
     static constexpr uint16_t kSpeedRampUp=20;
@@ -58,13 +55,14 @@ private:
     //ramp
     PID rampUpPID;
     PID rampDownPID;
-    PID CenterPID;
     bool slope=false;
     static constexpr float kMinRampOrientation=18.0; 
     //control Walls
     static constexpr float minDisToLateralWall=6;
     float changeAngle=0;
     static constexpr uint8_t maxChangeAngle=3;
+    static constexpr uint8_t CenterDistance=0;
+    PID CenterPID;
     //PID movement constants
     static constexpr float kP_mov=1;
     static constexpr float kI_mov=0.00;
@@ -79,11 +77,12 @@ private:
     static constexpr float kP_RampUp=0.2;
     static constexpr float kI_RampUp=0.01;
     static constexpr float kD_RampUp=0.1;
-    //self center constants, Faltan de definir
+    //self centering constants
     static constexpr float kP_Center=0.0;
     static constexpr float kI_Center=0.0;
     static constexpr float kD_Center=0.0;
-    static constexpr uint8_t CenterTime=0;
+    static constexpr uint8_t CenterTime=5;
+    
     //TCS
     char tileColor;
     static constexpr char kBlueColor = 'B';
@@ -96,16 +95,16 @@ private:
     float servoPos=90;
     static constexpr uint16_t servoPosRight=133;
     static constexpr uint16_t servoPosLeft=50;
+    //initialized
 public:
     //objets
     Adafruit_VL53L0X lox = Adafruit_VL53L0X();
     BNO bno;
-    TCS tcs_;
-    LimitSwitch limitSwitch_[2];
+   
     VLX vlx[kNumVlx];
     Servo servo;
     Motor motor[4];
-    Leds leds;
+
     //public variables
     bool sameOrientation=false;
     unsigned long buttonTime=millis();
@@ -113,7 +112,8 @@ public:
     bool blackTile=false;
     bool blueTile=false;
     bool checkpoint=false;
-    bool selfCentering=false;
+    bool innit =false;
+    
     uint8_t victim=0;
     uint8_t kitState=kitID::kNone;
     bool buttonPressed=false;
@@ -124,8 +124,8 @@ public:
     void PID_speed(float, float, uint16_t);
     void PID_Wheel(int,int);
     void PID_AllWheels(int);
-    double PID_selfCenter(uint16_t);
-    void pidEncoders(int,bool,bool);
+    void pidEncoders(int,bool);
+    float PID_selfCenter();
     void setSpeed(uint16_t);
     float changeSpeedMove(bool,bool,int,bool);
     //set movement
@@ -152,11 +152,11 @@ public:
     void resetOrientation();
     void resetVlx();
     //sensors
-    void checkTileColor();
-    void limitCrash();
     float nearWall();
     void passObstacle();
     bool isWall(uint8_t);
+    //float AverageRightDistance();
+    //float AverageLeftDistance();
     //victims
     void harmedVictim();
     void stableVictim();
@@ -176,13 +176,10 @@ public:
     void resetTics();
     //ramp
     bool rampInFront();
-    bool isRamp();
-    void ramp();
+    //bool isRamp();
     //comunication
-    void wait(unsigned long);
     void wifiPrint(String,float);
     void screenBegin();
-    void screenPrint(String);
     void printSpeeds();
     void printAngle();
 };

@@ -10,22 +10,24 @@
 
 class VLX{
 private:
+    MUX mux_;
     static constexpr uint8_t kMaxInitAttempts_ = 5;
-    float lastDistance = 0.0f;
-    SemaphoreHandle_t i2cSemaphore;
-    static MUX mux;
     static constexpr uint32_t kTimingBudget = 33000;
-    static constexpr uint32_t vDelay = 20;
+    static constexpr uint32_t vDelay = 33;
 
 public:
     static constexpr uint8_t kDistanceToWall=15;
+    float distance = 0.0f;
+    bool initialized = false;
     Adafruit_VL53L0X VLX_ = Adafruit_VL53L0X();
     VL53L0X_RangingMeasurementData_t measure;
+    void updateDistance();
     float getDistance();
     VLX();
-    VLX(const uint8_t);
-    void begin();
     VLX(int,int);
     bool isWall();
+    VLX(const uint8_t);
+    void setMux(const uint8_t);
+    void begin();
 };
 #endif

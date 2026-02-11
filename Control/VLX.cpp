@@ -2,51 +2,47 @@
 #include <Arduino.h>
 #include <Wire.h>
 
-VLX::VLX(){
-}
+VLX::VLX() {}
 
-VLX::VLX(const uint8_t posMux){
+VLX::VLX(const uint8_t posMux) {
     mux_.setNewChannel(posMux);
 }
 
-void VLX::begin(){
-    if (i2cSemaphore == NULL) {i2cSemaphore = xSemaphoreCreateMutex();}
+void VLX::begin() {
+    initialized = false;
     mux_.selectChannel();
-    VLX_.begin();
     if (!VLX_.begin()) {
         Serial.println("Error initializing VL53L0X sensor.");
+        Serial.println(MUX_ADDR);
         while (1);
     }
-    Serial.println("VL53L0X initialized correctly.");  
-    VLX_.setMeasurementTimingBudgetMicroSeconds(kTimingBudget); //Precision mode
-    VLX_.startRanging();
+    Serial.println("VL53L0X initialized correctly.");
+    VLX_.setMeasurementTimingBudgetMicroSeconds(kTimingBudget);
+    VLX_.startRangeContinuous();
+    initialized = true;
 }
 
-/*example:
+void VLX::setMux(const uint8_t posMux) {
+    mux_.setNewChannel(posMux);
+}
 
-void VLX::VLXTask(void *pv){
-    VL53L0X_RangingMeasurementData_t measure;
+void VLX::updateDistance() {
+    mux_.selectChannel();
 
-    while (true){
-        xSemaphoreTake(i2cSemaphore, portMAX_DELAY);
-
-        for (int i: PriorityTaskID::Type tasksID){
-            mux.selectChannel(i);
-            vlx_hw.rangingTest(&measure, false);
-
-            if (vlx_hw.RangeStatus != 4) {
-                vlx[i].lastDistance = (float)measure.RangeMilliMeter / 10.0f;
-            }
+    if (VLX_.isRangeComplete()) {
+        distance = (float)(VLX_.readRange()) / 10.0f;
         }
-        xSemaphoreGive(i2cSemaphore);
-        vTaskDelay(pdMS_TO_TICKS(vDelay));
+}
+
+float VLX::getDistance() {
+    if (initialized) {
+        return distance;
+    }
+    else {
+        return -1.0f;
     }
 }
-*/
-float VLX::getDistance() const {
-    return lastDistance;
-}
 
-bool VLX::isWall() const{
-    return (getDistance()<kDistanceToWall);
+bool VLX::isWall() {
+    return (getDistance() < kDistanceToWall);
 }
