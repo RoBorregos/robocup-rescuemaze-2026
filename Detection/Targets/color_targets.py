@@ -4,6 +4,7 @@ import numpy as np
 COLORS = {
     "BLUE":   {"id": 2,  "h_range": (100, 130), "min_s": 50},
     "GREEN":  {"id": 1,  "h_range": (40, 95),   "min_s": 30},
+ 
     "RED":    {"id": -1, "h_range1": (0, 15),   "h_range2": (160, 180), "min_s": 50},
     "YELLOW": {"id": 0,  "h_range": (20, 35),   "min_s": 50},
     "BLACK":  {"id": -2, "max_v": 40}  # White/harmed center reference
