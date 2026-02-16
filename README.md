@@ -1,1 +1,0 @@
-# robocup-rescuemaze-2026
