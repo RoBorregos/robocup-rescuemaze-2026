@@ -5,7 +5,7 @@ Our robot is designed to autonomously explore the maze using a Depth First Searc
 | Name               | Github                                               |       Role   |
 | ------------------ | ---------------------------------------------------- | -------------|
 | Marco Galindo      | [@m2galindo](https://github.com/m2galindo)           | Programmer   |
-| Santiago Ramírez   | [@Champtiago](https://github.com/Champtiago)         | Programer    |
+| Santiago Ramírez   | [@Champtiago](https://github.com/Champtiago)         | Programmer   |
 | Salette            |	    			NA					                | Mechanic	   |
 | Becca Gómez        |                  NA				                    | Electronic   |
 
