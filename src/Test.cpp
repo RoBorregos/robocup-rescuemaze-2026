@@ -112,11 +112,25 @@ void testBnoY(){
     //robot.screenPrint(print);
     Serial.println(print);
 }
-//void calibrateColors(){
-    //robot.calibrateColors();
-//}
+
+void calibrateColors(){
+    robot.calibrateColors();
+}
 void pidTest(){
     robot.setahead();
     robot.pidEncoders(20,true);
-    // robot.PID_Wheel(4,MotorID::kFrontLeft);
+    robot.PID_Wheel(4,MotorID::kFrontLeft);
+}
+
+void testTCS(){
+    robot.tcs_.updateRGBC();
+    robot.tcs_.printRGB();
+    char color=robot.tcs_.getColor();
+    String print=static_cast<String>(color);
+    //robot.screenPrint(print);
+    Serial.println(print);
+}
+
+void testTurn(float angle){
+    robot.rotate(angle);
 }

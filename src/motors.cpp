@@ -2,6 +2,7 @@
 #include "Pins_ID.h"
 #include <WiFi.h>
 #include "Encoder.h"
+#include "RightHand.h"
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 motors::motors(){
@@ -10,7 +11,6 @@ motors::motors(){
 void motors::setupMotors(){
     for(uint8_t i=0;i<4;i++){
         motor[i].initialize(Pins::digitalOne[i],Pins::digitalTwo[i],Pins::pwmPin[i],i);
-        //Serial.println(Pins::pwmPin[i]);
         myPID[i].changeConstants(kP_mov,kI_mov,kD_mov,movTime);
     }
     
@@ -26,12 +26,10 @@ void motors::setupMotors(){
     setupVlx(vlxID::frontRight);
     setupVlx(vlxID::rightUp);
     setupVlx(vlxID::frontLeft);
-    //setupVlx(vlxID::leftDown);
     setupVlx(vlxID::back);
     //setupTCS();
     rampUpPID.changeConstants(kP_RampUp,kI_RampUp,kD_RampUp,rampTime);
     rampDownPID.changeConstants(kP_RampDown,kI_RampDown,kD_RampDown,rampTime);
-    //bno.setupBNO();
     
     targetAngle=0;
     delay(500); 
@@ -43,22 +41,6 @@ void motors::printAngle(){
     Serial.println(angulo);
 }
 
-float motors::PID_selfCenter(){
-    float error=0;
-    float rightDistance=vlx[vlxID::rightUp].getDistance();
-    float leftDistance=vlx[vlxID::leftUp].getDistance();
-    if(rightDistance<maxVlxDistance && leftDistance<maxVlxDistance){
-        error=CenterPID.calculate_PID(rightDistance,leftDistance);
-    }
-    else if(rightDistance<maxVlxDistance){
-        error=CenterPID.calculate_PID(CenterDistance,rightDistance);
-    }
-    else if(leftDistance<maxVlxDistance){
-        error=CenterPID.calculate_PID(leftDistance,CenterDistance);
-    }
-    else error=0;
-    return error;
-}
 void motors::PID_speed(float setpoint,float angle, uint16_t reference_speed){
     PID PID;
     double output=PID.calculate_PID(setpoint,angle);
@@ -144,7 +126,7 @@ void motors::ahead(){
     if(!encoder){
         float targetDistance=findNearest(distance,frontVlx ? targetDistances:targetDistancesB,2,frontVlx);
         targetDistance=targetDistance;
-        while(frontVlx ? (distance>=targetDistance):(distance<=targetDistance)){//poner rango
+        while(frontVlx ? (distance>=targetDistance):(distance<=targetDistance)){
             setahead();
             //checkTileColor();
             if(blackTile) break;
@@ -482,10 +464,10 @@ void motors::stop(){
     inMotion=false;
 }
 void motors::printSpeeds(){
-    double speedM1=motor[0].getSpeed();
-    double speedM2=motor[1].getSpeed();
-    double speedM3=motor[2].getSpeed();
-    double speedM4=motor[3].getSpeed();
+    float speedM1=motor[0].getSpeed();
+    float speedM2=motor[1].getSpeed();
+    float speedM3=motor[2].getSpeed();
+    float speedM4=motor[3].getSpeed();
     Serial.println("Velocidades:");
     Serial.print("Motor1:"); Serial.print(speedM1);
     Serial.print("Motor2:"); Serial.print(speedM2);
@@ -746,203 +728,10 @@ void motors::moveDistance(uint8_t targetDistance, bool ahead){
     //stop(); 
 }
 
-void motors::smoothRotate(float deltaAngle) {
-    float currentSpeed = kMaxSpeedFormard;
-
-    resetTics();
-    setahead();
-    while(getAvergeTics() < (kTicsPerTile)) {
-        if(buttonPressed) break;
-        float missingDistance=kTileLength-(getAvergeTics()*kTileLength/kTicsPerTile);
-        float speed=map(missingDistance,kTileLength,0,kMaxSpeedFormard,kMinSpeedFormard);
-        speed=constrain(speed,kMinSpeedFormard,kMaxSpeedFormard);
-        pidEncoders(speed, true);
-    }
-    stop();resetTics();
-    targetAngle=deltaAngle;
-    delayMicroseconds(1);
-    bno.getOrientationX();
-    float currentAngle,rightAngularDistance, leftAngularDistance,minInterval,maxInterval,tolerance=2;
-    bool hexadecimal;
-    //calculate angular distance in both directions
-    if(targetAngle>=angle){
-        rightAngularDistance=targetAngle-angle;
-        leftAngularDistance=angle+(360-targetAngle);
-    }else{
-        rightAngularDistance=(360-angle)+targetAngle;
-        leftAngularDistance=angle-targetAngle;
-    }
-    //define target interval and use angle or z_rotation
-    if(targetAngle!=360 && targetAngle!=0){ 
-        minInterval=(targetAngle-tolerance),maxInterval=(targetAngle+tolerance);
-        hexadecimal=true;
-    }else{
-        targetAngle=0;
-        minInterval=-tolerance,maxInterval=tolerance;
-        hexadecimal=false;
-    }
-    //decide shortest route and rotate
-    (rightAngularDistance<=leftAngularDistance) ? (limitColition ? setrightTraslation():setright()):(limitColition ? setleftTraslation():setleft());
-
-    currentAngle=hexadecimal ? angle:z_rotation;
-    
-    while(currentAngle<minInterval||currentAngle>maxInterval) {
-        if(buttonPressed) break;
-        bno.getOrientationX();
-        currentAngle=hexadecimal ? angle:z_rotation;
-        changeSpeedMove(false,true,0,false);
-    }
-    stop();resetTics();
-    setahead();
-    while(getAvergeTics() < (kTicsPerTile)) {
-        if(buttonPressed) break;
-        currentSpeed = map(getAvergeTics(), 0, (kTicsPerTile), 
-                          kMinSpeedFormard, kMaxSpeedFormard);
-        pidEncoders(currentSpeed, true);
-    }
-    stop();resetTics();
-}
-
-void motors::corner(float deltaAngle){
-    passObstacle();
-    nearWall();
-    resetTics();
-    int offset=0;
-    int turnDirection;
-    float distance;
-    float tilepercentage=2.0/3.0;
-    float maxInterpolation = 0.15;
-    float minInterpolation = 0.03;
-    float TurnSpeed;
-    bool encoder,frontVlx;
-    bool rampCaution=false;
-    float frontDistance=vlx[vlxID::frontRight].getDistance();
-    float backDistance;
-    if(frontDistance<maxVlxDistance && frontDistance>=1){
-        distance=frontDistance*tilepercentage;
-        encoder=false;
-        frontVlx=true;
-    }else{ 
-        backDistance=vlx[vlxID::back].getDistance();
-        if((backDistance<maxVlxDistance-kTileLength)&& frontDistance>=1){
-            distance=backDistance*tilepercentage;
-            encoder=false;
-            frontVlx=false;
-        }else encoder=true;
-    }
-
-    String print=static_cast<String>(frontDistance);
-    //robot.screenPrint(print);
-    //if(frontDistance>300) rampCaution=true;
-    if(abs(bno.getOrientationY())>4 ){
-        encoder=true;offset=kTicsPerTile/6;
-    } 
-    if(!encoder){
-        float targetDistance=findNearest(distance,frontVlx ? targetDistances:targetDistancesB,2,frontVlx);
-        targetDistance=targetDistance;
-        while(frontVlx ? (distance>=targetDistance):(distance<=targetDistance)){//poner rango
-            setahead();
-            //checkTileColor();
-            if(blackTile) break;
-            if(buttonPressed) break;
-            //if(isRamp()) break;
-            //limitCrash();
-            distance=(frontVlx ? vlx[vlxID::frontRight].getDistance():vlx[vlxID::back].getDistance());
-            float missingDistance=abs(distance-targetDistance);
-            float speed;
-            speed=map(missingDistance,kTileLength,0,kMaxSpeedFormard,kMinSpeedFormard);
-            if(slope==true){
-                missingDistance=kTileLength-(getAvergeTics()*kTileLength/kTicsPerTile);
-                speed=map(missingDistance,kTileLength,0,kMaxSpeedFormard,kMinSpeedFormard);
-                if(getAvergeTics()>kTicsPerTile) break;
-            }
-            //if(rampCaution) speed=map(missingDistance,kTileLength,0,(kMaxSpeedFormard/3),kMinSpeedFormard);
-            speed=constrain(speed,kMinSpeedFormard,kMaxSpeedFormard);
-            pidEncoders(speed,true);
-        }
-    }else if(encoder){
-        while(getAvergeTics()<(kTicsPerTile*tilepercentage-offset)){
-            setahead();
-            // limitCrash();
-            //checkTileColor();
-            if(blackTile) return;
-            if(buttonPressed) break;
-            //if(isRamp()) break;
-            float missingDistance=kTileLength-(getAvergeTics()*kTileLength/kTicsPerTile);
-            float speed=map(missingDistance,kTileLength,0,kMaxSpeedFormard,kMinSpeedFormard);
-            speed=constrain(speed,kMinSpeedFormard,kMaxSpeedFormard);
-            //if(rampCaution) speed=map(missingDistance,kTileLength,0,(kMaxSpeedFormard/3),kMinSpeedFormard);
-            pidEncoders(speed,true);
-        }
-    }
-    slope=false;
-    stop();
-    resetTics();
-    delayMicroseconds(1);
-    bno.getOrientationX();
-    float currentAngle,rightAngularDistance, leftAngularDistance,minInterval,maxInterval,tolerance=2;
-    bool hexadecimal;
-    //calculate angular distance in both directions
-    if(targetAngle>=angle){
-        rightAngularDistance=targetAngle-angle;
-        leftAngularDistance=angle+(360-targetAngle);
-    }else{
-        rightAngularDistance=(360-angle)+targetAngle;
-        leftAngularDistance=angle-targetAngle;
-    }
-    //define target interval and use angle or z_rotation
-    if(targetAngle!=360 && targetAngle!=0){ 
-        minInterval=(targetAngle-tolerance),maxInterval=(targetAngle+tolerance);
-        hexadecimal=true;
-    }else{
-        targetAngle=0;
-        minInterval=-tolerance,maxInterval=tolerance;
-        hexadecimal=false;
-    }
-    //decide shortest route and rotate
-    (rightAngularDistance<=leftAngularDistance) ? (turnDirection = 1):(turnDirection = -1);
-    setahead();
-    currentAngle=hexadecimal ? angle:z_rotation;
-    while(true){
-        if(buttonPressed) break;
-        if(currentAngle >= minInterval && currentAngle <= maxInterval) break;
-        if(getCurrentBackDistance() >= kTileLength/3) break;
-        bno.getOrientationX();
-        currentAngle = hexadecimal ? angle : z_rotation;
-        float missingDistance = kTileLength - (getAverageBackTics() * kTileLength / kTicsPerTile);
-        float speed = map(missingDistance, kTileLength, 0, kMaxSpeedFormard, kMinSpeedFormard);
-        speed = constrain(speed, kMinSpeedFormard, kMaxSpeedFormard);
-        float angleError;
-        if(hexadecimal) angleError = abs(targetAngle - angle);
-        else angleError = abs(z_rotation);
-        float interpolation = map(angleError, 0, 90, minInterpolation, maxInterpolation);
-        interpolation = constrain(interpolation, minInterpolation, maxInterpolation);
-        TurnSpeed = speed * interpolation * turnDirection;
-        PID_Wheel(speed + TurnSpeed, MotorID::kFrontLeft);
-        PID_Wheel(speed - TurnSpeed, MotorID::kFrontRight);
-        PID_Wheel(speed, MotorID::kBackLeft);
-        PID_Wheel(speed, MotorID::kBackRight);
-    }
-    stop();
-    rotate(deltaAngle);
-    stop();resetTics();
-}
-
 float motors::getCurrentDistanceCm(){
     return getAvergeTics()*kTileLength/kTicsPerTile;
 }
 
-double getAverageBackTics(){
-    int totalTics = 1;
-    //totalTics+=motor[MotorID::kBackRight].getTics();
-    //totalTics+=motor[MotorID::kBackLeft].getTics();
-    return totalTics / 2.0;
-}
-
-
-float motors::getCurrentBackDistance(){
-    return getAverageBackTics()*kTileLength/kTicsPerTile;
-}
 
 float motors::getAngleOrientation(){
     float currentAngle=bno.getOrientationX();
@@ -1093,7 +882,7 @@ void motors::setupTCS() {
 
 void motors::screenBegin(){
     display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
-    Serial.println("Pantalla inicializada");
+    Serial.println("Screen initialized");
 }
 void motors::screenPrint(String output){
     display.clearDisplay();

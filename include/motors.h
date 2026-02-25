@@ -21,6 +21,7 @@
 
 constexpr uint8_t edgeTileDistance=6;
 constexpr uint8_t kTileLength=30;
+static constexpr uint32_t vDelay = 33;
 constexpr uint8_t rulet[4][4]={{0,1,2,3},{3,0,1,2},{2,3,0,1},{1,2,3,0}};
 constexpr uint8_t targetDistances[]={edgeTileDistance+2,kTileLength+edgeTileDistance+2};
 constexpr uint8_t targetDistancesB[]={kTileLength+edgeTileDistance-2,2*kTileLength+edgeTileDistance-2};
@@ -147,8 +148,6 @@ public:
     void left();
     void right();  
     void rotate(float);  
-    void smoothRotate(float);
-    void corner(float);
     void wait(unsigned long targetTime);
     void moveDistance(uint8_t targetDistance, bool);
     void writeServo(uint16_t servoAngle);
@@ -175,8 +174,6 @@ public:
     float getCurrentDistanceCm();
     float getAngleOrientation();
     double getAvergeTics();
-    double getAverageBackTics();
-    float getCurrentBackDistance();
     double getTicsSpeed();
     //logic
     void checkpointElection();
