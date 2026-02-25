@@ -6,3 +6,5 @@
 test
 build
 lib
+.vscode/compile_commands.json
+.Ds_Store
