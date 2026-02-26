@@ -1,13 +1,12 @@
-#ifndef TILE_DIRECTION_H
-#define TILE_DIRECTION_H
+#ifndef TileDirection_h
+#define TileDirection_h
 
-#include <cstdint>
-
-enum class TileDirection : uint8_t {
-    kNorth = 0,
-    kEast = 1,
-    kSouth = 2,
-    kWest = 3
+enum class TileDirection: uint8_t {
+    kUp = 0,
+    kRight = 1,
+    kDown = 2,
+    kLeft = 3,
+    kNone
 };
 
 #endif
