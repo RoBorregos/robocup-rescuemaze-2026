@@ -3,8 +3,6 @@
 #include "Test.h"
 #include "motors.h"
 #include "Pins_ID.h"
-#include "RightHand.h"
-
 
 SemaphoreHandle_t i2cSemaphore;
 
@@ -126,8 +124,6 @@ void RightHandNavigationTask(void *pv) {
     Serial.println(" cm");
     Serial.print("Back: "); Serial.print(robot.vlx[vlxID::back].getDistance());
     Serial.println(" cm");
-
-    rightHandRule(); //comment out if not using
     
     vTaskDelay(pdMS_TO_TICKS(800));
   }
