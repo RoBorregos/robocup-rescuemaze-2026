@@ -9,7 +9,7 @@ maze m;
 int servopos=0;
 bool mazeStarted = false;
 void setup() {
-  // put your setup code here, to run once:
+
   pinMode(2,OUTPUT);
   digitalWrite(2,1);
   Serial.begin(115200);
@@ -38,41 +38,4 @@ void loop() {
   
   delay(1000);
   Serial.println("Loop iteration complete");
-  
-  // // robot.leds.sequency();
-
-  // robot.kitLeft(1);
-  // delay(1000);
-  // robot.kitRight(1);
-  // delay(1000);
-
-  // robot.ahead();
-  // testTCS();
-  // robot.setahead();
-  // robot.setSpeed(50);
-
-  // jeetson.getDetection();
-  // delay(300);
-  // testButton();
-  // robot.ahead();
-  // testMotors();
-  // testPIDWheel();
-
-  // pidTest();
-  // calibrateColors();
-  // robot.checkpointElection(); 
-  // robot.buttonPressed=false;
-  // testTCS();
-  // testLimits();
-  // testBnoY();
-
-  // testMotors();
-  // testEncoders();
-  // testVlxFrontDistance();
-  // testVlxFrontLeft();
-  // testVlxFrontRigth();
-  // testVlxRight();
-  // testVlxLeft();
-  // testVlxFront();
-  // testVlxBack();
 }
