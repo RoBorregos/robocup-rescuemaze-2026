@@ -1,7 +1,6 @@
 #include "Encoder.h"
 #include "motors.h"
 motors robot;
-
 void Interrups::backRightEncoder() {
     robot.motor[MotorID::kBackRight].updateTics();
 }
