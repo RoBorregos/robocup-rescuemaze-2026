@@ -6,7 +6,6 @@
 maze m;
 int servopos=0;
 void setup() {
-  // put your setup code here, to run once:
   pinMode(2,OUTPUT);
   digitalWrite(2,1);
   Serial.begin(115200);
@@ -21,41 +20,5 @@ void setup() {
 }
 
 void loop() {
-  // // robot.leds.sequency();
-  // robot.kitLeft(1);
-  // delay(1000);
-  // robot.kitRight(1);
-  // delay(1000);
-  //Serial.println(" PUTO");
-  m.run_algs();
-  // robot.ahead();
- //testTCS();
-  // robot.setahead();
-  // robot.setSpeed(50);
-
-  // jeetson.getDetection();
-  // delay(300);
-  // testButton();
-  // robot.ahead();
-  // testMotors();
-  // testPIDWheel();
-
-  // pidTest();
-   //calibrateColors();
-  // Serial.println("Colors calibrated");
-  // robot.checkpointElection(); 
-  // robot.buttonPressed=false;
-  //testTCS();
-  // testLimits();
-  // testBnoY();
-
-  // testMotors();
-  // testEncoders();
-  // testVlxFrontDistance();
-  // testVlxFrontLeft();
-  // testVlxFrontRigth();
-  // testVlxRight();
-  // testVlxLeft();
-  // testVlxFront();
-  // testVlxBack();
+    m.run_algs();
 }
