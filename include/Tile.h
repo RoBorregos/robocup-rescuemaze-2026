@@ -1,7 +1,7 @@
 #ifndef Tile_h
 #define Tile_h
 
-#include "coord.h"
+#include "algs/coord.h"
 #include <cstdint>
 #include "TileDirection.h"
 #include "Arduino.h"
