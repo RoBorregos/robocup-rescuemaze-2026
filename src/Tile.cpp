@@ -1,4 +1,4 @@
-#include "Tile.h"
+#include "algs/Tile.h"
 
 Tile::Tile(){
     this->position_ = kInvalidPosition;
