@@ -22,7 +22,7 @@ void TCS::init() {
 #endif
         }
     }
-    Serial.println("TCS inicializado");
+    Serial.println("TCS initialized correctly.");
 }
 
 void TCS::setDefaultValues() {
