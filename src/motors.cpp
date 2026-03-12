@@ -21,9 +21,9 @@ void motors::setupMotors(){
     //screenBegin();
     //screenPrint("r");
     bno.setupBNO();
-    setupVlx(vlxID::leftUp);
+    setupVlx(vlxID::left);
     setupVlx(vlxID::frontRight);
-    setupVlx(vlxID::rightUp);
+    setupVlx(vlxID::right);
     setupVlx(vlxID::frontLeft);
     setupVlx(vlxID::back);
     //setupTCS();
@@ -200,10 +200,10 @@ void motors::checkTileColor(){
 float motors::nearWall(){
     //float left = AverageLeftDistance();
     //float right = AverageRightDistance();
-    if(vlx[vlxID::leftUp].getDistance()<minDisToLateralWall ){
+    if(vlx[vlxID::left].getDistance()<minDisToLateralWall ){
         changeAngle=maxChangeAngle;
     }
-    else if(vlx[vlxID::rightUp].getDistance()<minDisToLateralWall){
+    else if(vlx[vlxID::right].getDistance()<minDisToLateralWall){
         changeAngle=-maxChangeAngle;
     }else{
         changeAngle=0;
@@ -498,24 +498,24 @@ void motors::setupVlx(const uint8_t index) {
 void motors::resetVlx() {
     screenBegin();
     setupVlx(vlxID::frontLeft);
-    setupVlx(vlxID::leftUp);
+    setupVlx(vlxID::left);
     //|setupVlx(vlxID::leftDown);
     //setupVlx(vlxID::front);
     setupVlx(vlxID::frontRight);
-    setupVlx(vlxID::rightUp);
+    setupVlx(vlxID::right);
     setupVlx(vlxID::back);
 }
 
 /*
 float motors::AverageLeftDistance(){
     float frontLeftDistance=vlx[vlxID::frontLeft].getDistance();
-    float leftUpDistance=vlx[vlxID::leftUp].getDistance();
+    float leftDistance=vlx[vlxID::left].getDistance();
 
-    if (frontLeftDistance <= maxVlxDistance && leftUpDistance <= maxVlxDistance) {
-        return (frontLeftDistance+leftUpDistance)/2;
-    } else if (frontLeftDistance > maxVlxDistance && leftUpDistance <= maxVlxDistance) {
-        return leftUpDistance;
-    } else if (frontLeftDistance <= maxVlxDistance && leftUpDistance > maxVlxDistance) {
+    if (frontLeftDistance <= maxVlxDistance && leftDistance <= maxVlxDistance) {
+        return (frontLeftDistance+leftDistance)/2;
+    } else if (frontLeftDistance > maxVlxDistance && leftDistance <= maxVlxDistance) {
+        return leftDistance;
+    } else if (frontLeftDistance <= maxVlxDistance && leftDistance > maxVlxDistance) {
         return frontLeftDistance;
     }
     else {
@@ -524,13 +524,13 @@ float motors::AverageLeftDistance(){
 }
 float motors::AverageRightDistance(){
     float rightDownDistance=vlx[vlxID::rightDown].getDistance();
-    float rightUpDistance=vlx[vlxID::rightUp].getDistance();
+    float rightDistance=vlx[vlxID::right].getDistance();
 
-    if (rightDownDistance <= maxVlxDistance && rightUpDistance <= maxVlxDistance) {
-        return (rightDownDistance+rightUpDistance)/2;
-    } else if (rightDownDistance > maxVlxDistance && rightUpDistance <= maxVlxDistance) {
-        return rightUpDistance;
-    } else if (rightDownDistance <= maxVlxDistance && rightUpDistance > maxVlxDistance) {
+    if (rightDownDistance <= maxVlxDistance && rightDistance <= maxVlxDistance) {
+        return (rightDownDistance+rightDistance)/2;
+    } else if (rightDownDistance > maxVlxDistance && rightDistance <= maxVlxDistance) {
+        return rightDistance;
+    } else if (rightDownDistance <= maxVlxDistance && rightDistance > maxVlxDistance) {
         return rightDownDistance;
     }
     else {
@@ -567,13 +567,13 @@ bool motors::isWall(uint8_t direction){
             wall1=vlx[vlxID::frontRight].isWall();
             return wall1;
         case 1:
-            wall2=vlx[vlxID::rightUp].isWall();
+            wall2=vlx[vlxID::right].isWall();
             return wall2;
         case 2:
             wall3=vlx[vlxID::back].isWall();
             return wall3;
         case 3:
-            wall4=vlx[vlxID::leftUp].isWall();
+            wall4=vlx[vlxID::left].isWall();
             return wall4;
         default: 
           return false;

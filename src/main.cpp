@@ -6,9 +6,6 @@ maze m;
 
 int servopos=0;
 void setup() {
-
-  pinMode(2,OUTPUT);
-  digitalWrite(2,1);
   Serial.begin(115200);
   robot.setupMotors();
   //pinMode(Pins::checkpointPin,INPUT_PULLDOWN);
