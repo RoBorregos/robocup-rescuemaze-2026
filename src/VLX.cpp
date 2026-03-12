@@ -11,10 +11,10 @@ void VLX::begin(){
     mux_.selectChannel();
     VLX_.begin();
     if (!VLX_.begin()) {
-        Serial.println("¡Error al iniciar el sensor VL53L0X!");
+        Serial.println("Error on sensor VL53L0X!");
         while (1);
     }
-    Serial.println("VL53L0X iniciado correctamente.");  
+    Serial.println("VL53L0X inicilaized properly.");  
 }
 
 void VLX::setMux(const uint8_t posMux) {
@@ -47,7 +47,7 @@ void VLX::printDistance(){
         Serial.print(measure.RangeMilliMeter);
         Serial.println(" mm");
     } else {
-        Serial.println("Fuera de rango.");
+        Serial.println("Out of range.");
     }
     delay(500); 
     }
