@@ -3,26 +3,8 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
-// ===============================
-// NUEVO firmware: polling por SERIAL (USB)
-// ===============================
-// Protocolo TX (ESP -> host):
-//   [0xFF][0xAA][len=0x01][cmd][checksum]
-//   checksum = (len + cmd) & 0xFF
-//   cmd 0x02 = pedir camara derecha
-//   cmd 0x03 = pedir camara izquierda
-//
-// Protocolo RX (host -> ESP):
-//   [0xFF][0xAA][len=0x02][cam_id][victim_id][checksum]
-//   checksum = (len + cam_id + victim_id) & 0xFF
-//   cam_id:    0=derecha, 1=izquierda
-//   victim_id: 0=None, 1=PHI, 2=PSI, 3=OMEGA
-
-// ----- Serial de enlace -----
-// Se usa Serial (USB) para protocolo binario.
-// IMPORTANTE: evitar logs por Serial para no corromper paquetes.
-static const uint32_t LINK_BAUD = 115200;
 static const bool ENABLE_DEBUG_LOGS = false;
+static const uint32_t LINK_BAUD = 115200;
 
 static const uint8_t OLED_SDA_PIN = 21;
 static const uint8_t OLED_SCL_PIN = 22;
@@ -39,7 +21,7 @@ static const uint8_t STATUS_LED_PIN = 2;
 static const uint8_t STATUS_LED_PIN = LED_BUILTIN;
 #endif
 
-// ----- Protocolo -----
+// ----- Protocol -----
 static const uint8_t HEADER0 = 0xFF;
 static const uint8_t HEADER1 = 0xAA;
 
@@ -65,12 +47,12 @@ static uint8_t lastCamId = CAM_RIGHT;
 static uint8_t lastVictimId = VICTIM_NONE;
 static uint32_t packetCounter = 0;
 
-// Polling continuo
+// Continuous polling
 static const uint32_t POLL_INTERVAL_MS = 120;
 static uint32_t lastPollMs = 0;
 static bool askRightNext = true;
 
-// Estado del parser RX
+// RX parser state
 enum RxState : uint8_t {
   WAIT_FF,
   WAIT_AA,
@@ -151,8 +133,8 @@ void sendAck(uint8_t ackCode) {
 }
 
 void doAction(uint8_t camId, uint8_t victimId) {
-  // Aqui va tu "hacer X cosa" real.
-  // De momento dejamos una accion de ejemplo con LED y logs.
+  // Put your real "do X action" logic here.
+  // For now, this keeps a sample action with LED and logs.
 
   if (ENABLE_DEBUG_LOGS) {
     Serial.print("[ACTION] cam=");
@@ -165,7 +147,7 @@ void doAction(uint8_t camId, uint8_t victimId) {
     Serial.println(victimLabel(victimId));
   }
 
-  // Ejemplo: numero de parpadeos por tipo de victima
+  // Example: blink count by victim type
   uint8_t blinks = 1;
   if (victimId == VICTIM_PHI) blinks = 2;
   else if (victimId == VICTIM_PSI) blinks = 3;
@@ -273,9 +255,9 @@ void parseIncomingByte(uint8_t b) {
         handlePacket(rxLen, rxPayload);
       } else {
         if (ENABLE_DEBUG_LOGS) {
-          Serial.print("[RX] checksum invalido. esperado=0x");
+          Serial.print("[RX] invalid checksum. expected=0x");
           Serial.print(rxChecksum, HEX);
-          Serial.print(" recibido=0x");
+          Serial.print(" received=0x");
           Serial.println(b, HEX);
         }
         sendAck(ACK_ERR_CHECKSUM);
@@ -317,7 +299,7 @@ void setup() {
 }
 
 void loop() {
-  // 1) Polling continuo (ESP siempre pide)
+  // 1) Continuous polling (ESP always requests)
   const uint32_t now = millis();
   if (now - lastPollMs >= POLL_INTERVAL_MS) {
     lastPollMs = now;
@@ -326,7 +308,7 @@ void loop() {
     sendRequest(cmd);
   }
 
-  // 2) Procesar bytes entrantes
+  // 2) Process incoming bytes
   while (Serial.available() > 0) {
     uint8_t b = (uint8_t)Serial.read();
     parseIncomingByte(b);

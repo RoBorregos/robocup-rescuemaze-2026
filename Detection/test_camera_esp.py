@@ -1,30 +1,30 @@
 #!/usr/bin/env python3
 """
-Test de comunicación ESP32 ↔ Raspberry Pi / PC
+ESP32 ↔ Raspberry Pi / PC communication test
 
-Uso:
+Usage:
     python test_camera_esp.py [puerto]
-    Ejemplo: python test_camera_esp.py /dev/ttyUSB0
+    Example: python test_camera_esp.py /dev/ttyUSB0
 
-Desde la terminal escribe:
-    <camara> <victima>
-    Ejemplos:
-        0 PHI   →  cámara derecha,   víctima PHI   Φ (Heated)
-        1 PSI   →  cámara izquierda, víctima PSI   Ψ (Stable)
-        0 OMEGA →  cámara derecha,   víctima OMEGA Ω (Unheated)
-        1 N     →  cámara izquierda, víctima N       (ninguna)
+Type in terminal:
+    <camera> <victim>
+    Examples:
+        0 PHI   →  right camera, PHI   Φ (Heated)
+        1 PSI   →  left camera,  PSI   Ψ (Stable)
+        0 OMEGA →  right camera, OMEGA Ω (Unheated)
+        1 N     →  left camera,  N       (none)
 
-Cámaras:
-    0 = derecha  (right)
-    1 = izquierda (left)
+Cameras:
+    0 = right
+    1 = left
 
-Víctimas soportadas:
+Supported victims:
     PHI   → Heated   Φ (0x01)
     PSI   → Stable   Ψ (0x02)
     OMEGA → Unheated Ω (0x03)
     N     → None       (0x00)
 
-Protocolo del paquete enviado a la ESP:
+Packet protocol sent to ESP:
     [0xFF] [0xAA] [len=0x02] [cam_id] [victim_id] [checksum]
     checksum = (len + cam_id + victim_id) & 0xFF
 """
@@ -37,7 +37,7 @@ import glob
 from serial import Serial
 from serial.serialutil import SerialException
 
-# ── Configuración ─────────────────────────────────────────────────────────────
+# ── Configuration ─────────────────────────────────────────────────────────────
 BAUDRATE = 115200
 TIMEOUT  = 1.0
 
@@ -65,11 +65,11 @@ def resolve_port() -> str:
         "Pass one manually, e.g. python Detection/test_camera_esp.py /dev/cu.usbserial-1140"
     )
 
-# ── Protocolo ─────────────────────────────────────────────────────────────────
+# ── Protocol ───────────────────────────────────────────────────────────────────
 HEADER0 = 0xFF
 HEADER1 = 0xAA
 
-# Comandos que manda la ESP para pedir detección
+# Commands sent by ESP to request detection
 CMD_REQUEST_RIGHT = 0x02
 CMD_REQUEST_LEFT  = 0x03
 ACK_OK            = 0x00
@@ -78,7 +78,7 @@ ACK_ERR_CAM       = 0xE2
 ACK_ERR_VICTIM    = 0xE3
 ACK_ERR_CHECKSUM  = 0xE4
 
-# IDs de víctimas
+# Victim IDs
 VICTIM_MAP = {
     "PHI":   0x01,   # Heated   Φ
     "PSI":   0x02,   # Stable   Ψ
@@ -86,7 +86,7 @@ VICTIM_MAP = {
     "N":     0x00,   # None
 }
 
-# IDs de cámara
+# Camera IDs
 CAM_MAP = {
     "0": 0,   # right 
     "1": 1,   # left 
@@ -113,12 +113,12 @@ def build_packet(cam_id: int, victim_id: int) -> bytes:
 
 class EspTester:
     def __init__(self, port: str, baudrate: int = BAUDRATE):
-        print(f"Conectando a {port} @ {baudrate} bauds...")
+        print(f"Connecting to {port} @ {baudrate} baud...")
         self.ser = Serial(port=port, baudrate=baudrate, timeout=TIMEOUT)
         time.sleep(1)
-        print("¡Conectado!\n")
+        print("Connected!\n")
 
-        # FSM for recibe packs to ESP
+        # RX packet FSM
         self.WAITING_FF    = 0
         self.WAITING_AA    = 1
         self.RECEIVE_LEN   = 2
@@ -132,12 +132,12 @@ class EspTester:
 
         self.mutex = _thread.allocate_lock()
 
-        # Valores pendientes seteados desde el teclado
+        # Pending values set from keyboard input
         self.pending_cam_id    = None
         self.pending_victim_id = None
         self.last_waiting_notice = 0.0
 
-    #  Reception FSM  
+    # Reception FSM
     def _fsm(self, byte: bytes) -> bool:
         if self.state_ == self.WAITING_FF:
             if byte == b'\xff':
@@ -200,13 +200,13 @@ class EspTester:
                     return code
         return None
 
-    # ── Hilo de teclado ───────────────────────────────────────────────────────
+    # ── Keyboard thread ───────────────────────────────────────────────────────
     def _keyboard_thread(self):
         print("=" * 52)
-        print("Escribe: <camara> <victima>  y presiona Enter")
-        print("  Camaras : 0=derecha  1=izquierda")
-        print("  Victimas: PHI=Heated(Φ)  PSI=Stable(Ψ)  OMEGA=Unheated(Ω)  N=None")
-        print("  Ejemplo : '0 PHI'  o  '1 OMEGA'")
+        print("Type: <camera> <victim> and press Enter")
+        print("  Cameras: 0=right  1=left")
+        print("  Victims: PHI=Heated(Φ)  PSI=Stable(Ψ)  OMEGA=Unheated(Ω)  N=None")
+        print("  Example: '0 PHI' or '1 OMEGA'")
         print("=" * 52 + "\n")
 
         while True:
@@ -216,35 +216,35 @@ class EspTester:
                 break
 
             if len(line) != 2:
-                print("  [!] Formato incorrecto. Ejemplo: '0 phi' o '1 omega'\n")
+                print("  [!] Invalid format. Example: '0 PHI' or '1 OMEGA'\n")
                 continue
 
             cam_str, victim_str = line
 
             if cam_str not in CAM_MAP:
-                print(f"  [!] Camara invalida '{cam_str}'. Usa 0 o 1\n")
+                print(f"  [!] Invalid camera '{cam_str}'. Use 0 or 1\n")
                 continue
 
             if victim_str not in VICTIM_MAP:
-                print(f"  [!] Victima invalida '{victim_str}'. Opciones: {list(VICTIM_MAP.keys())}\n")
+                print(f"  [!] Invalid victim '{victim_str}'. Options: {list(VICTIM_MAP.keys())}\n")
                 continue
 
             cam_id    = CAM_MAP[cam_str]
             victim_id = VICTIM_MAP[victim_str]
 
-            print(f"  [OK] Encolado -> camara={cam_id} ({CAM_LABEL[cam_id]}) | victima={victim_str} (0x{victim_id:02X})")
-            print("       Se enviara cuando la ESP pida esa camara.")
+            print(f"  [OK] Queued -> camera={cam_id} ({CAM_LABEL[cam_id]}) | victim={victim_str} (0x{victim_id:02X})")
+            print("       It will be sent when ESP requests that camera.")
             self.pending_cam_id    = cam_id
             self.pending_victim_id = victim_id
 
-    # ── Bucle principal 
+    # ── Main loop
     def run(self):
         _thread.start_new_thread(self._keyboard_thread, ())
-        print("Esperando peticiones de la ESP... (modo manual, sin autoenvio)\n")
+        print("Waiting for ESP requests... (manual mode, no auto-send)\n")
 
         while True:
             try:
-                # ── Esperar petición de la ESP ────────────────────────────────
+                # ── Wait for ESP request ──────────────────────────────────────
                 ok = self.recv_packet(timeout=1.5)
                 if not ok:
                     continue
@@ -261,37 +261,37 @@ class EspTester:
                 if self.pending_cam_id is None or self.pending_victim_id is None:
                     now = time.time()
                     if now - self.last_waiting_notice >= 2.0:
-                        # print("  [MANUAL] Esperando que escribas: <camara> <victima>")
+                        # print("  [MANUAL] Waiting for input: <camera> <victim>")
                         self.last_waiting_notice = now
                     continue
 
                 if self.pending_cam_id != requested_cam:
                     print(
-                        f"  [MANUAL] Encolado para camara={self.pending_cam_id} "
-                        f"({CAM_LABEL[self.pending_cam_id]}), esperando la peticion correcta.\n"
+                        f"  [MANUAL] Queued for camera={self.pending_cam_id} "
+                        f"({CAM_LABEL[self.pending_cam_id]}), waiting for matching request.\n"
                     )
                     continue
 
                 victim_id = self.pending_victim_id
                 print(
-                    f"[ESP->Pi] Peticion recibida para camara={requested_cam} "
+                    f"[ESP->Pi] Request received for camera={requested_cam} "
                     f"({CAM_LABEL[requested_cam]})"
                 )
                 self.send_packet(requested_cam, victim_id)
                 ack_code = self.wait_ack(timeout=0.8)
                 if ack_code is None:
-                    print("  [ESP ACK] TIMEOUT (sin confirmacion)\n")
+                    print("  [ESP ACK] TIMEOUT (no confirmation)\n")
                 else:
                     print(f"  [ESP ACK] 0x{ack_code:02X} ({ACK_LABEL[ack_code]})\n")
                 self.pending_cam_id = None
                 self.pending_victim_id = None
 
             except KeyboardInterrupt:
-                print("\nCerrando conexion...")
+                print("\nClosing connection...")
                 self.ser.close()
                 sys.exit(0)
             except SerialException as e:
-                print(f"[error serial] {e} - reintentando en 2 s...")
+                print(f"[serial error] {e} - retrying in 2 s...")
                 time.sleep(2)
 
 
