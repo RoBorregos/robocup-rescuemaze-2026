@@ -46,6 +46,12 @@ static const uint8_t HEADER1 = 0xAA;
 static const uint8_t CMD_REQUEST_RIGHT = 0x02;
 static const uint8_t CMD_REQUEST_LEFT  = 0x03;
 
+static const uint8_t ACK_OK            = 0x00;
+static const uint8_t ACK_ERR_LEN       = 0xE1;
+static const uint8_t ACK_ERR_CAM       = 0xE2;
+static const uint8_t ACK_ERR_VICTIM    = 0xE3;
+static const uint8_t ACK_ERR_CHECKSUM  = 0xE4;
+
 static const uint8_t CAM_RIGHT = 0;
 static const uint8_t CAM_LEFT  = 1;
 
@@ -132,6 +138,18 @@ void sendRequest(uint8_t cmd) {
   }
 }
 
+void sendAck(uint8_t ackCode) {
+  const uint8_t len = 0x01;
+  const uint8_t checksum = (uint8_t)((len + ackCode) & 0xFF);
+  const uint8_t pkt[5] = {HEADER0, HEADER1, len, ackCode, checksum};
+  Serial.write(pkt, sizeof(pkt));
+
+  if (ENABLE_DEBUG_LOGS) {
+    Serial.print("[ESP->Pi] ACK=0x");
+    Serial.println(ackCode, HEX);
+  }
+}
+
 void doAction(uint8_t camId, uint8_t victimId) {
   // Aqui va tu "hacer X cosa" real.
   // De momento dejamos una accion de ejemplo con LED y logs.
@@ -169,6 +187,7 @@ void handlePacket(uint8_t len, const uint8_t* payload) {
       Serial.print("[RX] len invalido: ");
       Serial.println(len);
     }
+    sendAck(ACK_ERR_LEN);
     return;
   }
 
@@ -180,6 +199,7 @@ void handlePacket(uint8_t len, const uint8_t* payload) {
       Serial.print("[RX] cam_id invalido: ");
       Serial.println(camId);
     }
+    sendAck(ACK_ERR_CAM);
     return;
   }
 
@@ -188,6 +208,7 @@ void handlePacket(uint8_t len, const uint8_t* payload) {
       Serial.print("[RX] victim_id invalido: ");
       Serial.println(victimId);
     }
+    sendAck(ACK_ERR_VICTIM);
     return;
   }
 
@@ -208,6 +229,7 @@ void handlePacket(uint8_t len, const uint8_t* payload) {
   renderOled();
 
   doAction(camId, victimId);
+  sendAck(ACK_OK);
 }
 
 void parseIncomingByte(uint8_t b) {
@@ -256,6 +278,7 @@ void parseIncomingByte(uint8_t b) {
           Serial.print(" recibido=0x");
           Serial.println(b, HEX);
         }
+        sendAck(ACK_ERR_CHECKSUM);
       }
       rxState = WAIT_FF;
       break;

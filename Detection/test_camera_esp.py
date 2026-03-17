@@ -72,6 +72,11 @@ HEADER1 = 0xAA
 # Comandos que manda la ESP para pedir detección
 CMD_REQUEST_RIGHT = 0x02
 CMD_REQUEST_LEFT  = 0x03
+ACK_OK            = 0x00
+ACK_ERR_LEN       = 0xE1
+ACK_ERR_CAM       = 0xE2
+ACK_ERR_VICTIM    = 0xE3
+ACK_ERR_CHECKSUM  = 0xE4
 
 # IDs de víctimas
 VICTIM_MAP = {
@@ -88,6 +93,13 @@ CAM_MAP = {
 }
 
 CAM_LABEL = {0: "RIGHT", 1: "LEFT"}
+ACK_LABEL = {
+    ACK_OK: "OK",
+    ACK_ERR_LEN: "ERR_LEN",
+    ACK_ERR_CAM: "ERR_CAM",
+    ACK_ERR_VICTIM: "ERR_VICTIM",
+    ACK_ERR_CHECKSUM: "ERR_CHECKSUM",
+}
 
 
 def build_packet(cam_id: int, victim_id: int) -> bytes:
@@ -175,6 +187,19 @@ class EspTester:
         print(f"  [Pi->ESP] paquete: {pkt.hex(' ').upper()}")
         print(f"            camara={cam_id} ({CAM_LABEL[cam_id]}) | victima={victim_id} ({victim_label})\n")
 
+    def wait_ack(self, timeout: float = 0.8):
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            ok = self.recv_packet(timeout=0.2)
+            if not ok:
+                continue
+
+            if self.msg_len_ == 1:
+                code = self.cmd_byte_[0]
+                if code in ACK_LABEL:
+                    return code
+        return None
+
     # ── Hilo de teclado ───────────────────────────────────────────────────────
     def _keyboard_thread(self):
         print("=" * 52)
@@ -253,6 +278,11 @@ class EspTester:
                     f"({CAM_LABEL[requested_cam]})"
                 )
                 self.send_packet(requested_cam, victim_id)
+                ack_code = self.wait_ack(timeout=0.8)
+                if ack_code is None:
+                    print("  [ESP ACK] TIMEOUT (sin confirmacion)\n")
+                else:
+                    print(f"  [ESP ACK] 0x{ack_code:02X} ({ACK_LABEL[ack_code]})\n")
                 self.pending_cam_id = None
                 self.pending_victim_id = None
 
