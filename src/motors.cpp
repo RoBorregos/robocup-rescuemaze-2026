@@ -1,6 +1,7 @@
 #include "motors.h"
 #include "Pins_ID.h"
 #include <WiFi.h>
+#include "Encoder.h"
 
 //Jetson jettson;
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
