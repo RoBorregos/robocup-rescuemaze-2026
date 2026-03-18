@@ -85,7 +85,7 @@ void motors::pidEncoders(int speedReference,bool ahead){
 
 void motors::ahead(){
     passObstacle();
-    passObstacle();
+    passObstacle(); //double verification (if obstacle still in the way rotate, else, ignore)
     nearWall();
     resetTics();
     int offset=0;;
@@ -204,8 +204,7 @@ void motors::passObstacle(){
     float sideAngle = targetAngle_;
     bool leftBlocked = vlx[vlxID::frontLeft].getDistance() < kDistanceToObstacle;
     bool rightBlocked = vlx[vlxID::frontRight].getDistance() < kDistanceToObstacle;
-    if ((vlx[vlxID::frontLeft].isWall() && vlx[vlxID::frontRight].isWall()) ||
-        (!rightBlocked && !leftBlocked)) {
+    if ((vlx[vlxID::frontLeft].isWall() && vlx[vlxID::frontRight].isWall()) || (!rightBlocked && !leftBlocked)) {
         return;
     }
     moveDistance(kTileLength/5, false);
@@ -214,7 +213,7 @@ void motors::passObstacle(){
         sideAngle -= 25;
         if (sideAngle >= 360) sideAngle -= 360;
         if (sideAngle < 0) sideAngle += 360;
-        rotate(sideAngle);
+        rotate(sideAngle); //rotate 25 degrees to the left
         moveDistance(kTileLength/5, true);
     }
 
@@ -222,11 +221,10 @@ void motors::passObstacle(){
         sideAngle += 25;
         if (sideAngle >= 360) sideAngle -= 360;
         if (sideAngle < 0) sideAngle += 360;
-        rotate(sideAngle);
+        rotate(sideAngle); //rotate 25 degrees to the right
         moveDistance(kTileLength/5, true);
     }
     rotate(targetAngle_);
-    moveDistance(kTileLength/5, true);
     targetAngle = targetAngle_;
     limitColition = false;
 }
