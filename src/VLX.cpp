@@ -1,8 +1,9 @@
 #include "VLX.h"
+#include <Arduino.h>
+#include <Wire.h>
 
-VLX::VLX(){
+VLX::VLX(){}
 
-}
 VLX::VLX(const uint8_t posMux){
     mux_.setNewChannel(posMux);
 }
@@ -11,8 +12,7 @@ void VLX::begin(){
     mux_.selectChannel();
     VLX_.begin();
     if (!VLX_.begin()) {
-        Serial.println("Error on sensor VL53L0X!");
-        while (1);
+        Serial.println("Error on sensor VL53L0X!"); while (1);
     }
     Serial.println("VL53L0X inicilaized properly.");  
 }
@@ -27,14 +27,12 @@ void VLX::updateDistance() {
 float VLX::getDistance(){
     updateDistance();
     if (measure.RangeStatus != 4) {
-    distance=measure.RangeMilliMeter;
-    distance=distance/10;
+    distance=measure.RangeMilliMeter/10;
     return distance;
     }else{
         updateDistance();
         if (measure.RangeStatus != 4) {
-        distance=measure.RangeMilliMeter;
-        distance=distance/10;
+        distance=measure.RangeMilliMeter/10;
         return distance;
         }
     }
