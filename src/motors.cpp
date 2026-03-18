@@ -225,6 +225,7 @@ void motors::passObstacle(){
         moveDistance(kTileLength/5, true);
     }
     rotate(targetAngle_);
+    moveDistance(kTileLength/5, true);
     targetAngle = targetAngle_;
     limitColition = false;
 }
