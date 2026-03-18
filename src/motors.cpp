@@ -1,46 +1,42 @@
 #include "motors.h"
 #include "Pins_ID.h"
 #include <WiFi.h>
-#include "Encoder.h"
-#include "RightHand.h"
 
+//Jetson jettson;
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 motors::motors(){
 }
-
 void motors::setupMotors(){
     for(uint8_t i=0;i<4;i++){
         motor[i].initialize(Pins::digitalOne[i],Pins::digitalTwo[i],Pins::pwmPin[i],i);
+        Serial.println(Pins::pwmPin[i]);
         myPID[i].changeConstants(kP_mov,kI_mov,kD_mov,movTime);
     }
-    
     rampUpPID.changeConstants(kP_RampUp,kI_RampUp,kD_RampUp,rampTime);
     rampDownPID.changeConstants(kP_RampDown,kI_RampDown,kD_RampDown,rampTime);
-    CenterPID.changeConstants(kP_Center, kI_Center, kD_Center, CenterTime);
-    Wire.begin(21, 22);
-    Wire.setClock(400000);
+    Wire.begin();
     //screenBegin();
     //screenPrint("r");
     bno.setupBNO();
-    setupVlx(vlxID::leftUp);
-    setupVlx(vlxID::frontRight);
-    setupVlx(vlxID::rightUp);
     setupVlx(vlxID::frontLeft);
+    setupVlx(vlxID::left);
+    //setupVlx(vlxID::front);
+    setupVlx(vlxID::frontRight);
+    setupVlx(vlxID::right);
     setupVlx(vlxID::back);
-    //setupTCS();
-    rampUpPID.changeConstants(kP_RampUp,kI_RampUp,kD_RampUp,rampTime);
-    rampDownPID.changeConstants(kP_RampDown,kI_RampDown,kD_RampDown,rampTime);
-    
+    setupTCS();
+    //leds.setupLeds();
+    //limitSwitch_[LimitSwitchID::kLeft].initLimitSwitch(Pins::limitSwitchPins[LimitSwitchID::kLeft]);
+    //limitSwitch_[LimitSwitchID::kRight].initLimitSwitch(Pins::limitSwitchPins[LimitSwitchID::kRight]);
+    //pinMode(Pins::checkpointPin, INPUT_PULLDOWN);
+    //servo.attach(Pins::servoPin);
+    //servo.write(servoPos);
     targetAngle=0;
-    delay(500); 
-    innit = true;
-
 }
 void motors::printAngle(){
     double angulo=bno.getOrientationX();
     Serial.println(angulo);
 }
-
 void motors::PID_speed(float setpoint,float angle, uint16_t reference_speed){
     PID PID;
     double output=PID.calculate_PID(setpoint,angle);
@@ -76,24 +72,18 @@ void motors::PID_AllWheels(int targetSpeed){
 void motors::pidEncoders(int speedReference,bool ahead){
     bno.getOrientationX();
     speedReference;
-    float selfCenteringError;
     PID pidBno(0.5,0.1,0.01,1);
     if(rampState!=0) changeAngle=0;
-    float AngleError=pidBno.calculate_PID(targetAngle+changeAngle,(targetAngle==0 ? z_rotation:angle));
-    AngleError=constrain(AngleError,-17,17);
-    // Serial.println(AngleError);
-    Serial.println(AngleError);
-    if(!ahead) AngleError=-AngleError;
-    //selfCenteringError = PID_selfCenter();
-    //selfCenteringError = constrain(selfCenteringError, -8, 8);//Holder values
-
-    PID_Wheel(speedReference+AngleError,MotorID::kFrontLeft);
-    PID_Wheel(speedReference+AngleError,MotorID::kBackLeft);
-    PID_Wheel(speedReference-AngleError,MotorID::kFrontRight);
-    PID_Wheel(speedReference-AngleError,MotorID::kBackRight);
+    float error=pidBno.calculate_PID(targetAngle+changeAngle,(targetAngle==0 ? z_rotation:angle));
+    error=constrain(error,-17,17);//aumentar
+    // Serial.println(error);
+    Serial.println(angle);
+    if(!ahead) error=-error;
+    PID_Wheel(speedReference+error,MotorID::kFrontLeft);
+    PID_Wheel(speedReference+error,MotorID::kBackLeft);
+    PID_Wheel(speedReference-error,MotorID::kFrontRight);
+    PID_Wheel(speedReference-error,MotorID::kBackRight);
 }
-
-
 void motors::ahead(){
     passObstacle();
     nearWall();
@@ -102,7 +92,7 @@ void motors::ahead(){
     float distance;
     bool encoder,frontVlx;
     bool rampCaution=false;
-    float frontDistance=vlx[vlxID::frontRight].getDistance();
+    float frontDistance=max(vlx[vlxID::frontLeft].getDistance(), vlx[vlxID::frontRight].getDistance());
     float backDistance;
     if(frontDistance<maxVlxDistance && frontDistance>=1){
         distance=frontDistance;
@@ -117,23 +107,25 @@ void motors::ahead(){
         }else encoder=true;
     }
 
-    String print=static_cast<String>(frontDistance);
-    //robot.screenPrint(print);
-    if(frontDistance>300) rampCaution=true;
-    if(abs(bno.getOrientationY())>15 ){
+    // String print=static_cast<String>(frontDistance);
+    // robot.screenPrint(print);
+    if(frontDistance>800) rampCaution=true;
+    if(abs(bno.getOrientationY())>4 ){
         encoder=true;offset=kTicsPerTile/6;
     } 
     if(!encoder){
-        float targetDistance=findNearest(distance,frontVlx ? targetDistances:targetDistancesB,2,frontVlx);
+        float targetDistance=findNearest(distance,frontVlx ? targetDistances:targetDistancesB,6,frontVlx);
         targetDistance=targetDistance;
-        while(frontVlx ? (distance>=targetDistance):(distance<=targetDistance)){
+        while(frontVlx ? (distance>=targetDistance):(distance<=targetDistance)){//poner rango
+            //passObstacle();
+            if(buttonPressed) break;
             setahead();
-            //checkTileColor();
+            checkTileColor();
             if(blackTile) break;
             if(buttonPressed) break;
-            //if(isRamp()) break;
-            //limitCrash();
-            distance=(frontVlx ? vlx[vlxID::frontRight].getDistance():vlx[vlxID::back].getDistance());
+            if(isRamp()) break;
+            limitCrash();
+            distance=(frontVlx ? max(vlx[vlxID::frontLeft].getDistance(), vlx[vlxID::frontRight].getDistance()):vlx[vlxID::back].getDistance());
             float missingDistance=abs(distance-targetDistance);
             float speed;
             speed=map(missingDistance,kTileLength,0,kMaxSpeedFormard,kMinSpeedFormard);
@@ -148,12 +140,14 @@ void motors::ahead(){
         }
     }else if(encoder){
         while(getAvergeTics()<kTicsPerTile-offset){
+            //passObstacle();
+            if(buttonPressed) break;
             setahead();
-            // limitCrash();
-            //checkTileColor();
+            limitCrash();
+            checkTileColor();
             if(blackTile) return;
             if(buttonPressed) break;
-            //if(isRamp()) break;
+            if(isRamp()) break;
             float missingDistance=kTileLength-(getAvergeTics()*kTileLength/kTicsPerTile);
             float speed=map(missingDistance,kTileLength,0,kMaxSpeedFormard,kMinSpeedFormard);
             speed=constrain(speed,kMinSpeedFormard,kMaxSpeedFormard);
@@ -162,18 +156,15 @@ void motors::ahead(){
         }
     }
     slope=false;
-    stop();
-    resetTics();
-    //checkTileColor();
+    stop();resetTics();checkTileColor();resetTics();
+    delay(50);
+   
 }
-
-
 void motors::checkTileColor(){
-    char tileColor=tcs_.getColor();
+    tileColor=tcs_.getColor();
     Serial.println(tileColor);
     if(tileColor==kBlackColor && inMotion==true){
         inMotion=false;
-        stop();
         resetTics();
         setback();
         blackTile=true;
@@ -182,100 +173,67 @@ void motors::checkTileColor(){
             if(buttonPressed) break;
             int speed=map(getAvergeTics(),0,kTicsPerTile/2,kMaxSpeedFormard,kMinSpeedFormard);
             pidEncoders(speed,false);
-            Serial.println("Black Tile");
-            //screenPrint("Black Tile");
+            screenPrint("Black Tile");
         }
         stop();resetTics();
     }else if(tileColor==kBlueColor&&inMotion==false){
-        //screenPrint("Blue Tile");
-        Serial.println("Blue Tile");
+        screenPrint("Blue Tile");
         blueTile=true;
         wait(5500);
     }else if(tileColor==kCheckpointColor&&inMotion==false){
         checkpoint=true;
-        Serial.println("Checkpoint Tile");
         // screenPrint("Checkpoint Tile");
     }
 }
 
 float motors::nearWall(){
-    //float left = AverageLeftDistance();
-    //float right = AverageRightDistance();
-    if(vlx[vlxID::leftUp].getDistance()<minDisToLateralWall ){
+    vlx[vlxID::left].getDistance();
+    vlx[vlxID::right].getDistance();
+    if(vlx[vlxID::left].distance<minDisToLateralWall ){
         changeAngle=maxChangeAngle;
-    }
-    else if(vlx[vlxID::rightUp].getDistance()<minDisToLateralWall){
+    }else if(vlx[vlxID::right].distance<minDisToLateralWall){
         changeAngle=-maxChangeAngle;
     }else{
         changeAngle=0;
     }
     return changeAngle;
 }
-
 void motors::passObstacle(){
     float targetAngle_=targetAngle;
-    float frontLeftDistance=vlx[vlxID::frontLeft].getDistance();
-    float frontRightDistance=vlx[vlxID::frontRight].getDistance();
-    if((frontLeftDistance>kDistanceToWall) && (frontRightDistance>kDistanceToWall) ){
+    bool LeftBlocked = vlx[vlxID::frontLeft].getDistance() < kDistanceToObstacle;
+    bool RightBlocked = vlx[vlxID::frontRight].getDistance() < kDistanceToObstacle;
+    if((vlx[vlxID::frontLeft].isWall()) && (vlx[vlxID::frontRight].isWall())){
         return;
     }
-    moveDistance(kTileLength/6,true);
-    if(frontRightDistance<kDistanceToWall){
+    //moveDistance(kTileLength/6,true);
+    if(RightBlocked && !LeftBlocked){
         // limitColition=true;
         if(targetAngle==360){
             targetAngle=0;
         }
-        rotate(targetAngle+25);
-    }else if(frontLeftDistance<kDistanceToWall){
+        rotate(targetAngle+35);
+        moveDistance(kTileLength/6,false);
+        rotate(targetAngle_);
+        moveDistance(kTileLength/6,true);
+    }else if(LeftBlocked && !RightBlocked){
         // limitColition=true;
         if(targetAngle==0){
             targetAngle=360;
         }
-        rotate(targetAngle-25);
+        rotate(targetAngle-35);
+        moveDistance(kTileLength/6,false);
+        rotate(targetAngle_);
+        moveDistance(kTileLength/6,true);
     }
-    delay(200);
-    moveDistance(kTileLength/5,false);
-    delay(200);
     targetAngle=targetAngle_;
-    rotate(targetAngle);
+    rotate(targetAngle_);
     limitColition=false;
 }
-/*
 void motors::limitCrash(){
-    float targetAngle_=targetAngle;
-    bool leftState=limitSwitch_[LimitSwitchID::kLeft].getState();
-    bool rightState=limitSwitch_[LimitSwitchID::kRight].getState();
-    if(slope) return;
-    if(rampState!=0 ){
-        if(leftState || rightState) limitColition=true;
-        return;
-    } 
-    if((leftState && rightState) || (!leftState && !rightState)){
-        return;
-    }
-    else if(rightState){
-        screenPrint("RightLimit");
-        Serial.println("rightlimit");
-        if(targetAngle==360){
-            targetAngle=0;
-        }
-        rotate(targetAngle+25);
-    }else if(leftState){
-        screenPrint("leftLimit");
-        Serial.println("rightlimit");
-        if(targetAngle==0){
-            targetAngle=360;
-        }
-        rotate(targetAngle-25);
-    }
-    delay(300);
-    moveDistance(kTileLength/6,false);
-    delay(300);
-    targetAngle=targetAngle_;
-    rotate(targetAngle);
-    limitColition=false;
+    // Limit switch collision logic disabled.
+    return;
 }
-*/
+
 uint8_t motors::findNearest(float number,const uint8_t numbers[],uint8_t size,bool frontVlx){
     if(frontVlx) number-=kTileLength;
     else if(!frontVlx) number+=kTileLength;
@@ -309,7 +267,6 @@ void motors::left(){
     targetAngle=targetAngle-90;
     rotate(targetAngle);
 }
-
 float motors::calculateAngularDistance(){
     float rightAngularDistance, leftAngularDistance;
     if(targetAngle>=angle){
@@ -347,7 +304,7 @@ void motors::rotate(float deltaAngle){
         hexadecimal=false;
     }
     //decide shortest route and rotate
-    (rightAngularDistance<=leftAngularDistance) ? (limitColition ? setrightTraslation():setright()):(limitColition ? setleftTraslation():setleft());
+    (rightAngularDistance<=leftAngularDistance) ? (setright()):(setleft());
 
     currentAngle=hexadecimal ? angle:z_rotation;
     while (currentAngle<minInterval||currentAngle>maxInterval){
@@ -358,8 +315,8 @@ void motors::rotate(float deltaAngle){
         // Serial.println(angle);
     }
     stop();
+    inMotion=true;
 }
-
 float motors::changeSpeedMove(bool encoders,bool rotate,int targetDistance,bool frontVlx){
     float speed;
     float missingDistance,missingAngle;
@@ -368,7 +325,7 @@ float motors::changeSpeedMove(bool encoders,bool rotate,int targetDistance,bool 
         speed=map(missingAngle,90,0,kMaxSpeedRotate,kMinSpeedRotate);
         speed=constrain(speed,kMinSpeedRotate,kMaxSpeedRotate);
         PID_AllWheels(speed);
-        return 0;
+        return speed;
     }else{
         if(encoders==true){
             speed=map(getAvergeTics(),0,kTicsPerTile,kMaxPwmFormard,kMinPwmFormard);
@@ -425,38 +382,6 @@ void motors::setleftTraslation(){
     motor[MotorID::kFrontRight].stop();
     // inMotion=true;
 }
-void motors::setrightCornerTraslation(){
-    motor[MotorID::kBackLeft].ahead();
-    motor[MotorID::kBackRight].stop();
-    motor[MotorID::kFrontLeft].ahead();
-    motor[MotorID::kFrontRight].ahead();
-    // inMotion=true;
-}
-
-void motors::setleftCornerTraslation(){
-    motor[MotorID::kBackLeft].stop();
-    motor[MotorID::kBackRight].ahead();
-    motor[MotorID::kFrontLeft].ahead();
-    motor[MotorID::kFrontRight].ahead();
-    // inMotion=true;
-}
-
-void motors::setrightCorner(){
-    motor[MotorID::kBackLeft].ahead();
-    motor[MotorID::kBackRight].back();
-    motor[MotorID::kFrontLeft].ahead();
-    motor[MotorID::kFrontRight].ahead();
-    // inMotion=true;
-}
-
-void motors::setleftCorner(){
-    motor[MotorID::kBackLeft].back();
-    motor[MotorID::kBackRight].ahead();
-    motor[MotorID::kFrontLeft].ahead();
-    motor[MotorID::kFrontRight].ahead();
-    // inMotion=true;
-}
-
 void motors::stop(){
     for(uint8_t i=0;i<4;i++){ 
         motor[i].stop();}
@@ -464,10 +389,10 @@ void motors::stop(){
     inMotion=false;
 }
 void motors::printSpeeds(){
-    float speedM1=motor[0].getSpeed();
-    float speedM2=motor[1].getSpeed();
-    float speedM3=motor[2].getSpeed();
-    float speedM4=motor[3].getSpeed();
+    double speedM1=motor[0].getSpeed();
+    double speedM2=motor[1].getSpeed();
+    double speedM3=motor[2].getSpeed();
+    double speedM4=motor[3].getSpeed();
     Serial.println("Velocidades:");
     Serial.print("Motor1:"); Serial.print(speedM1);
     Serial.print("Motor2:"); Serial.print(speedM2);
@@ -499,47 +424,12 @@ void motors::setupVlx(const uint8_t index) {
 void motors::resetVlx() {
     screenBegin();
     setupVlx(vlxID::frontLeft);
-    setupVlx(vlxID::leftUp);
-    //|setupVlx(vlxID::leftDown);
-    //setupVlx(vlxID::front);
+    setupVlx(vlxID::left);
+    // setupVlx(vlxID::front);
     setupVlx(vlxID::frontRight);
-    setupVlx(vlxID::rightUp);
+    setupVlx(vlxID::right);
     setupVlx(vlxID::back);
 }
-
-/*
-float motors::AverageLeftDistance(){
-    float frontLeftDistance=vlx[vlxID::frontLeft].getDistance();
-    float leftUpDistance=vlx[vlxID::leftUp].getDistance();
-
-    if (frontLeftDistance <= maxVlxDistance && leftUpDistance <= maxVlxDistance) {
-        return (frontLeftDistance+leftUpDistance)/2;
-    } else if (frontLeftDistance > maxVlxDistance && leftUpDistance <= maxVlxDistance) {
-        return leftUpDistance;
-    } else if (frontLeftDistance <= maxVlxDistance && leftUpDistance > maxVlxDistance) {
-        return frontLeftDistance;
-    }
-    else {
-        return maxVlxDistance;
-    }
-}
-float motors::AverageRightDistance(){
-    float rightDownDistance=vlx[vlxID::rightDown].getDistance();
-    float rightUpDistance=vlx[vlxID::rightUp].getDistance();
-
-    if (rightDownDistance <= maxVlxDistance && rightUpDistance <= maxVlxDistance) {
-        return (rightDownDistance+rightUpDistance)/2;
-    } else if (rightDownDistance > maxVlxDistance && rightUpDistance <= maxVlxDistance) {
-        return rightUpDistance;
-    } else if (rightDownDistance <= maxVlxDistance && rightUpDistance > maxVlxDistance) {
-        return rightDownDistance;
-    }
-    else {
-        return maxVlxDistance;
-    }
-}
-*/
-
 bool motors::isWall(uint8_t direction){
     uint8_t relativeDir;
     int deltaTargetAngle=static_cast<int>(targetAngle);
@@ -565,16 +455,16 @@ bool motors::isWall(uint8_t direction){
     switch(realPos) {
         bool wall1,wall2,wall3,wall4;
         case 0:
-            wall1=vlx[vlxID::frontRight].isWall();
+            wall1= (vlx[vlxID::frontLeft].isWall() && vlx[vlxID::frontRight].isWall());
             return wall1;
         case 1:
-            wall2=vlx[vlxID::rightUp].isWall();
+            wall2=vlx[vlxID::right].isWall();
             return wall2;
         case 2:
             wall3=vlx[vlxID::back].isWall();
             return wall3;
         case 3:
-            wall4=vlx[vlxID::leftUp].isWall();
+            wall4=vlx[vlxID::left].isWall();
             return wall4;
         default: 
           return false;
@@ -582,16 +472,12 @@ bool motors::isWall(uint8_t direction){
 }
 
 bool motors::rampInFront(){
-    if((vlx[vlxID::frontLeft].getDistance()-vlx[vlxID::frontRight].getDistance())>=2){
-        return true;
-    }else{
-        return false;
-    }
-}
-/*bool motors::isRamp() {
+    // Front VLX sensor disabled.
+    return false;
+}bool motors::isRamp() {
     float currentOrientationY = bno.getOrientationY();
     // screenPrint("isRamp");
-    if(abs(currentOrientationY)>7) slope=true;
+    if(abs(currentOrientationY)>15) slope=true;
     if (currentOrientationY >= kMinRampOrientation || currentOrientationY <= -kMinRampOrientation) {
         
         if (currentOrientationY <= -kMinRampOrientation) {
@@ -631,7 +517,7 @@ void motors::ramp(){
             pidEncoders(kSpeedRampUp,true);
         }
         rampState = 1; 
-        screenPrint("rampUp");
+        // screenPrint("rampUp");
     }
     while(bno.getOrientationY() < -7){
         if(buttonPressed==true)break;
@@ -652,7 +538,7 @@ void motors::ramp(){
             pidEncoders(kSpeedRampDown,true);
         }
         rampState = 2;
-        screenPrint("rampDown");
+        // screenPrint("rampDown");
     }
     if(getAvergeTics()>1*kTicsPerTile && rampState==1){
         // stop();
@@ -672,86 +558,37 @@ void motors::ramp(){
     limitColition=false;
     resetTics();stop();wait(100);
 }
-*/
-
-void motors::moveDistance(uint8_t targetDistance, bool ahead){
-    float initialDistance;
-    float currentDistance;
-    bool useVlx = true;
-    ahead ? setahead() : setback();
-    if (ahead){
-        float frontLeft = vlx[vlxID::frontLeft].getDistance();
-        float frontRight = vlx[vlxID::frontRight].getDistance();
-        if (frontLeft > maxVlxDistance || frontRight > maxVlxDistance) {
-            useVlx = false;
-        } else {
-            initialDistance = (frontLeft + frontRight) / 2.0;
-        }
-        while(true){
-            if(buttonPressed) break;
-            if(getCurrentDistanceCm() >= targetDistance) break;
-            if(useVlx) {
-                frontLeft = vlx[vlxID::frontLeft].getDistance();
-                frontRight = vlx[vlxID::frontRight].getDistance();
-                if (frontLeft > maxVlxDistance || frontRight > maxVlxDistance) {
-                    useVlx = false;
-                } else {
-                    currentDistance = (frontLeft + frontRight) / 2.0;
-                    if(abs(initialDistance - currentDistance) >= targetDistance) break;
-                }
-            }
-            pidEncoders((kMinSpeedFormard + kMaxSpeedFormard)/2, ahead);
-        }
-    }
-    else {
-        float backDistance = vlx[vlxID::back].getDistance();
-        if (backDistance > maxVlxDistance) {
-            useVlx = false;
-        } else {
-            initialDistance = backDistance;
-        }
-        while(true){
-            if(buttonPressed) break;
-            if(getCurrentDistanceCm() >= targetDistance) break;
-            if(useVlx) {
-                backDistance = vlx[vlxID::back].getDistance();
-                if (backDistance > maxVlxDistance) {
-                    useVlx = false;
-                } else {
-                    if(abs(initialDistance - backDistance) >= targetDistance) break;
-                }
-            }
-            pidEncoders((kMinSpeedFormard + kMaxSpeedFormard)/2, ahead);
-        }
-    }
+void motors::moveDistance(uint8_t targetDistance,bool ahead){
+    // screenPrint("leaving");
+    ahead ? setahead():setback();
     resetTics();
-    //stop(); 
+    while(getCurrentDistanceCm()<targetDistance){
+        if(buttonPressed) break;
+        pidEncoders((kMinSpeedFormard+kMaxSpeedFormard)/2,ahead);
+    }
+    stop(); 
 }
-
 float motors::getCurrentDistanceCm(){
     return getAvergeTics()*kTileLength/kTicsPerTile;
 }
-
-
 float motors::getAngleOrientation(){
     float currentAngle=bno.getOrientationX();
     if((currentAngle>315&&currentAngle<=360) || (currentAngle>=0&&currentAngle<=45)) return 0;
     else if(currentAngle>45&&currentAngle<=135) return 90;
     else if(currentAngle>135&&currentAngle<=225) return 180;
     else if(currentAngle>225&&currentAngle<=315) return 270;
-    else return currentAngle;
-}
 
+}
 void motors::resetOrientation(){
     bno.resetOrientation();
     targetAngle=0;
 }
 void motors::checkpointElection(){
     float angleOrientation=getAngleOrientation();
-    Serial.println("angle");
+    Serial.println("angule");
     String print;
     print=static_cast<String>(angleOrientation);
-    //screenPrint(print);
+    // screenPrint(print);
     Serial.println(angleOrientation);
     uint8_t angleThreshold=10;
     float currentAngle = (angleOrientation == 0) ? z_rotation : angle;
@@ -774,18 +611,9 @@ void motors::checkpointElection(){
     } 
     return;
 }
-/*
 void motors::victimSequency(){
-    float current=millis();
-    while((millis()-current)<5100){
-        screenPrint("Victim");
-        leds.setBlue();
-        delay(500);
-        screenPrint(" ");
-        leds.turnOff();
-        delay(500);
-    }
-    leds.setWhite(); 
+    // Screen/LED victim sequence disabled.
+    wait(5100);
 }
 void motors::harmedVictim(){
     victimSequency();
@@ -853,6 +681,12 @@ void motors::reloadKits(){
     writeServo(90);
 }
 
+void motors::setupTCS() {
+    tcs_.setMux(Pins::tcsPins[0]);
+    tcs_.init();
+    bno.setPhaseCorrection(bno.getOrientationX());
+    bno.setPhaseCorrectionY(bno.getOrientationY());
+}
 void motors::wait(unsigned long targetTime){
     unsigned long initialTime=millis();
     while((millis()-initialTime)<targetTime){
@@ -864,103 +698,13 @@ void motors::wifiPrint(String message, float i){
     // client.println(i);
     // Serial.println("Enviado: ");
 }
-
-*/
-void motors::wait(unsigned long targetTime){
-    unsigned long initialTime=millis();
-    while((millis()-initialTime)<targetTime){
-        if(buttonPressed) break;
-    }
-}
-
-void motors::setupTCS() {
-    tcs_.setMux(Pins::tcsPins[0]);
-    tcs_.init();
-    bno.setPhaseCorrection(bno.getOrientationX());
-    bno.setPhaseCorrectionY(bno.getOrientationY());
-}
-
 void motors::screenBegin(){
-    display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
-    Serial.println("Screen initialized");
+    // Screen disabled.
 }
 void motors::screenPrint(String output){
-    display.clearDisplay();
-    display.setTextSize(2);
-    display.setTextColor(WHITE);
-    display.setCursor(0, 10);
-    display.println(output);
-    display.display();
+    // Screen disabled.
+    (void)output;
 }
-  
 void motors::calibrateColors(){
-    uint16_t dt=10000;
-    //screenPrint("Blue Tile");
-    Serial.println("Blue Tile");
-    delay(dt);
-    tcs_.updateRGBC();
-    tcs_.printRGB();
-    float redInBlue=tcs_.red_;
-    float greenInBlue=tcs_.green_;
-    float blueInBlue=tcs_.blue_;
-
-    //screenPrint("Black Tile");
-    Serial.println("Black Tile");
-    delay(dt);
-    tcs_.updateRGBC();
-    tcs_.printRGB();
-    float redInBlack=tcs_.red_;
-    float greenInBlack=tcs_.green_;
-    float blueInBlack=tcs_.blue_;
-
-    //screenPrint("Checkpoint Tile");
-    Serial.println("Checkpoint Tile");
-    delay(dt);
-    tcs_.updateRGBC();
-    tcs_.printRGB();
-    float redInCheck=tcs_.red_;
-    float greenInCheck=tcs_.green_;
-    float blueInCheck=tcs_.blue_;
-    float clearInCheck=tcs_.clear_;
-
-    //screenPrint("white Tile");
-    Serial.println("White Tile");
-    delay(dt);
-    tcs_.updateRGBC();
-    tcs_.printRGB();
-    float redInWhite=tcs_.red_;
-    float greenInWhite=tcs_.green_;
-    float blueInWhite=tcs_.blue_;
-
-    while(true){
-        if(buttonPressed) break;
-        String print;
-        dt=2000;
-        Serial.print("RGB Blue");
-        delay(800);
-        print=static_cast<String>(redInBlue)+","+static_cast<String>(greenInBlue)+","+static_cast<String>(blueInBlue);
-        Serial.println(print);
-        delay(dt);
-
-        //screenPrint("RGB Black");
-        Serial.print("RGB Black");
-        delay(800);
-        print=static_cast<String>(redInBlack)+","+static_cast<String>(greenInBlack)+","+static_cast<String>(blueInBlack);
-        Serial.println(print);
-        delay(dt);
-
-        //screenPrint("RGB Check");
-        Serial.print("RGB Checkpoint");
-        delay(800);
-        print=static_cast<String>(redInCheck)+","+static_cast<String>(greenInCheck)+","+static_cast<String>(blueInCheck);
-        Serial.println(print);
-        delay(dt);
-
-        //screenPrint("RGB white");
-        Serial.print("RGB White");
-        delay(800);
-        print=static_cast<String>(redInWhite)+","+static_cast<String>(greenInWhite)+","+static_cast<String>(blueInWhite);
-        Serial.println(print);
-        delay(dt);
-    }
+    // TCS/screen color calibration disabled.
 }
