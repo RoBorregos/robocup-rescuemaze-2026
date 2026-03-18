@@ -230,8 +230,38 @@ void motors::passObstacle(){
     limitColition=false;
 }
 void motors::limitCrash(){
-    // Limit switch collision logic disabled.
-    return;
+    float targetAngle_=targetAngle;
+    bool leftState=limitSwitch_[LimitSwitchID::kLeft].getState();
+    bool rightState=limitSwitch_[LimitSwitchID::kRight].getState();
+    if(slope) return;
+    if(rampState!=0 ){
+        if(leftState || rightState) limitColition=true;
+        return;
+    } 
+    if((leftState && rightState) || (!leftState && !rightState)){
+        return;
+    }
+    else if(rightState){
+        screenPrint("RightLimit");
+        Serial.println("rightlimit");
+        if(targetAngle==360){
+            targetAngle=0;
+        }
+        rotate(targetAngle+25);
+    }else if(leftState){
+        screenPrint("leftLimit");
+        Serial.println("rightlimit");
+        if(targetAngle==0){
+            targetAngle=360;
+        }
+        rotate(targetAngle-25);
+    }
+    delay(300);
+    moveDistance(kTileLength/6,false);
+    delay(300);
+    targetAngle=targetAngle_;
+    rotate(targetAngle);
+    limitColition=false;
 }
 
 uint8_t motors::findNearest(float number,const uint8_t numbers[],uint8_t size,bool frontVlx){
