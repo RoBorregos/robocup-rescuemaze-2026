@@ -19,12 +19,12 @@
 #define PCA9548A_ADDR 0x70   // PCA9548A Direction
 #define PCA9548A_CHANNEL_4 0x20  // Canal 4 (SDA4/SCL4)
 
-constexpr uint8_t edgeTileDistance=6;
+constexpr uint8_t edgeTileDistance=10;
 constexpr uint8_t kTileLength=30;
-static constexpr uint32_t vDelay = 33;
 constexpr uint8_t rulet[4][4]={{0,1,2,3},{3,0,1,2},{2,3,0,1},{1,2,3,0}};
-constexpr uint8_t targetDistances[]={edgeTileDistance+2,kTileLength+edgeTileDistance+2};
-constexpr uint8_t targetDistancesB[]={kTileLength+edgeTileDistance-2,2*kTileLength+edgeTileDistance-2};
+constexpr uint8_t targetDistances[]={edgeTileDistance+1,kTileLength+edgeTileDistance+1};
+constexpr uint8_t targetDistancesB[]={kTileLength+edgeTileDistance-1,1*kTileLength+edgeTileDistance-1};
+
 
 class motors{
 private:
@@ -34,23 +34,23 @@ private:
     //vlx
     static constexpr uint8_t kNumVlx=8;
     static constexpr uint8_t maxVlxDistance=68;
-    static constexpr uint8_t brakingDis=2;
-    static constexpr uint8_t kDistanceToWall=15;
+    static constexpr uint8_t brakingDis=5;
+    static constexpr uint8_t kDistanceToWall=12;
     //wheels
-    static constexpr float wheelDiameter= 8.0;
+    static constexpr float wheelDiameter=7.5;
     static constexpr float distancePerRev=wheelDiameter*PI;
-    static constexpr float kTicsPerRev=496; //496
+    static constexpr float kTicsPerRev=496.0;
     static constexpr float kTicsPerTile=30*kTicsPerRev/distancePerRev;
     //Pwm constants
-    uint16_t kMinPwmRotate=100;
-    uint16_t kMaxPwmRotate=150;
-    uint16_t kMinPwmFormard=110;
+    uint16_t kMinPwmRotate=70;
+    uint16_t kMaxPwmRotate=160;
+    uint16_t kMinPwmFormard=70;
     uint16_t kMaxPwmFormard=180;
     //Speeds constants
-    static constexpr uint16_t kMinSpeedRotate=90;
-    static constexpr uint16_t kMaxSpeedRotate=120;
-    static constexpr uint16_t kMinSpeedFormard=110;
-    static constexpr uint16_t kMaxSpeedFormard=180;
+    static constexpr uint16_t kMinSpeedRotate=7;
+    static constexpr uint16_t kMaxSpeedRotate=30;
+    static constexpr uint16_t kMinSpeedFormard=5;
+    static constexpr uint16_t kMaxSpeedFormard=40;
     static constexpr uint16_t kSpeedRampUp=20;
     static constexpr uint16_t kSpeedRampDown=9;
     //ramp
@@ -62,8 +62,6 @@ private:
     static constexpr float minDisToLateralWall=6;
     float changeAngle=0;
     static constexpr uint8_t maxChangeAngle=3;
-    static constexpr uint8_t CenterDistance=0;
-    PID CenterPID;
     //PID movement constants
     static constexpr float kP_mov=1;
     static constexpr float kI_mov=0.00;
@@ -78,12 +76,6 @@ private:
     static constexpr float kP_RampUp=0.2;
     static constexpr float kI_RampUp=0.01;
     static constexpr float kD_RampUp=0.1;
-    //self centering constants
-    static constexpr float kP_Center=0.0;
-    static constexpr float kI_Center=0.0;
-    static constexpr float kD_Center=0.0;
-    static constexpr uint8_t CenterTime=5;
-    
     //TCS
     char tileColor;
     static constexpr char kBlueColor = 'B';
@@ -91,20 +83,21 @@ private:
     static constexpr char kRedColor = 'R';
     static constexpr char kCheckpointColor = 'C';
     //movement
-    bool limitColition=true;
+    bool limitColition=false;
     //servo
     float servoPos=90;
     static constexpr uint16_t servoPosRight=133;
     static constexpr uint16_t servoPosLeft=50;
-    //initialized
 public:
     //objets
     Adafruit_VL53L0X lox = Adafruit_VL53L0X();
     BNO bno;
     TCS tcs_;
+   // LimitSwitch limitSwitch_[2];
     VLX vlx[kNumVlx];
     Servo servo;
     Motor motor[4];
+    //Leds leds;
     //public variables
     bool sameOrientation=false;
     unsigned long buttonTime=millis();
@@ -112,20 +105,17 @@ public:
     bool blackTile=false;
     bool blueTile=false;
     bool checkpoint=false;
-    bool innit =false;
-    
     uint8_t victim=0;
     uint8_t kitState=kitID::kNone;
     bool buttonPressed=false;
     uint8_t rampState=rampID::kNone;
     motors();//constructor
-    //PID´s--speeds
+ //PID´s--speeds
     void setupMotors();
     void PID_speed(float, float, uint16_t);
     void PID_Wheel(int,int);
     void PID_AllWheels(int);
     void pidEncoders(int,bool);
-    float PID_selfCenter();
     void setSpeed(uint16_t);
     float changeSpeedMove(bool,bool,int,bool);
     //set movement
@@ -135,10 +125,6 @@ public:
     void setright();
     void setleftTraslation();
     void setrightTraslation();
-    void setrightCornerTraslation();
-    void setleftCornerTraslation();
-    void setrightCorner();
-    void setleftCorner();
     void stop();
     void calibrateColors();
     void victimSequency();
@@ -148,8 +134,7 @@ public:
     void left();
     void right();  
     void rotate(float);  
-    void wait(unsigned long targetTime);
-    void moveDistance(uint8_t targetDistance, bool);
+    void moveDistance(uint8_t targetDistance,bool);
     void writeServo(uint16_t servoAngle);
     //setups
     void setupTCS();
@@ -157,12 +142,11 @@ public:
     void resetOrientation();
     void resetVlx();
     //sensors
+    void checkTileColor();
+    void limitCrash();
     float nearWall();
     void passObstacle();
     bool isWall(uint8_t);
-    void checkTileColor();
-    //float AverageRightDistance();
-    //float AverageLeftDistance();
     //victims
     void harmedVictim();
     void stableVictim();
@@ -182,8 +166,10 @@ public:
     void resetTics();
     //ramp
     bool rampInFront();
-    //bool isRamp();
+    bool isRamp();
+    void ramp();
     //comunication
+    void wait(unsigned long);
     void wifiPrint(String,float);
     void screenBegin();
     void screenPrint(String);
