@@ -268,7 +268,8 @@ def main():
                     break
                 victim_id = detector.detect_for_camera(requested_cam)
                 link.send_detection(requested_cam, victim_id)
-            except Exception:
+            except Exception as e:
+                print(f"[WORKER] Error in detection: {e}", file=sys.stderr)
                 continue
     
     try:
@@ -288,25 +289,41 @@ def main():
         print("[INFO] Ready: waiting for ESP requests...")
 
         while True:
-            if not link.recv_packet(timeout=1.5):
-                continue
+            try:
+                if not link.recv_packet(timeout=1.5):
+                    continue
 
-            cmd = link.cmd_byte_
-            if cmd == bytes([CMD_REQUEST_RIGHT]):
-                requested_cam = CAM_RIGHT
-            elif cmd == bytes([CMD_REQUEST_LEFT]):
-                requested_cam = CAM_LEFT
-            else:
-                continue
+                cmd = link.cmd_byte_
+                if cmd == bytes([CMD_REQUEST_RIGHT]):
+                    requested_cam = CAM_RIGHT
+                elif cmd == bytes([CMD_REQUEST_LEFT]):
+                    requested_cam = CAM_LEFT
+                else:
+                    continue
 
-            # Queue detection request instead of blocking
-            pending_requests.put(requested_cam)
+                # Queue detection request instead of blocking
+                pending_requests.put(requested_cam)
+            except SerialException as serial_error:
+                print(f"[RECV] Serial error: {serial_error}", file=sys.stderr)
+                time.sleep(0.5)
+                continue
+            except Exception as e:
+                print(f"[RECV] Unexpected error: {e}", file=sys.stderr)
+                time.sleep(0.5)
+                continue
 
     except KeyboardInterrupt:
         print("\n[INFO] Stopping...")
         pending_requests.put(None)
     except SerialException as error:
-        print(f"[ERROR] Serial error: {error}")
+        print(f"[ERROR] Failed to open serial port: {error}")
+        sys.exit(1)
+    except FileNotFoundError as error:
+        print(f"[ERROR] {error}")
+        sys.exit(1)
+    except Exception as error:
+        print(f"[ERROR] Initialization failed: {error}")
+        sys.exit(1)
     finally:
         if detector is not None:
             detector.close()
