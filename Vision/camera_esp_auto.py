@@ -4,8 +4,10 @@ import glob
 import importlib
 import struct
 import sys
+import threading
 import time
 from pathlib import Path
+from queue import Queue
 
 from serial import Serial
 from serial.serialutil import SerialException
@@ -200,13 +202,6 @@ class DualCameraDetector:
         )
         return victim_id
 
-    def close(self):
-        for camera in self.cameras.values():
-            try:
-                camera.stop()
-            except Exception:
-                pass
-
 
 def resolve_port(cli_port: str | None) -> str:
     if cli_port:
@@ -262,6 +257,20 @@ def main():
 
     detector = None
     link = None
+    pending_requests = Queue()
+    
+    def detect_worker():
+        """Background thread: process detection requests in parallel."""
+        while True:
+            try:
+                requested_cam = pending_requests.get(timeout=0.5)
+                if requested_cam is None:
+                    break
+                victim_id = detector.detect_for_camera(requested_cam)
+                link.send_detection(requested_cam, victim_id)
+            except Exception:
+                continue
+    
     try:
         detector = DualCameraDetector(
             model_path=model_path,
@@ -271,6 +280,11 @@ def main():
             img_size=args.imgsz,
         )
         link = EspProtocolLink(port=port, baudrate=args.baud, timeout=args.timeout)
+        
+        # Start detection worker thread
+        worker_thread = threading.Thread(target=detect_worker, daemon=True)
+        worker_thread.start()
+        
         print("[INFO] Ready: waiting for ESP requests...")
 
         while True:
@@ -285,11 +299,12 @@ def main():
             else:
                 continue
 
-            victim_id = detector.detect_for_camera(requested_cam)
-            link.send_detection(requested_cam, victim_id)
+            # Queue detection request instead of blocking
+            pending_requests.put(requested_cam)
 
     except KeyboardInterrupt:
         print("\n[INFO] Stopping...")
+        pending_requests.put(None)
     except SerialException as error:
         print(f"[ERROR] Serial error: {error}")
     finally:
