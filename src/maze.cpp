@@ -37,22 +37,22 @@ void maze::followPath(Stack& path, arrCustom<Tile>& tiles, arrCustom<coord>& til
         if (next.x > robotCoord.x) {
             // if(robotOrientation != 90) detection(curr);
             if(robotOrientation == 270) robot.rotate(180);if(robot.buttonPressed) break; /* detection(curr); */ robot.rotate(90); if(robot.buttonPressed) break;
-            else robot.rotate(90); if(robot.buttonPressed) break; /* detection(curr); */ // caso en el que tenga que ir hacia atras en un dead end  
+            else robot.rotate(90); if(robot.buttonPressed) break; /* detection(curr); */ 
             robotOrientation = 90;
         } else if (next.x < robotCoord.x) {
             // if(robotOrientation != 270) detection(curr);
             if(robotOrientation == 90) robot.rotate(180);if(robot.buttonPressed) break; /* detection(curr); */ robot.rotate(270); if(robot.buttonPressed) break;
-            else robot.rotate(270); if(robot.buttonPressed) break; /* detection(curr); */ // caso en el que tenga que ir hacia atras en un dead end  
+            else robot.rotate(270); if(robot.buttonPressed) break; /* detection(curr); */ // case in which the robot has to go backwards in a dead end
             robotOrientation = 270;
         } else if (next.y > robotCoord.y) {
             // if(robotOrientation != 0) detection(curr); 
             if(robotOrientation == 180)robot.rotate(90);if(robot.buttonPressed) break; /* detection(curr); */ robot.rotate(0); if(robot.buttonPressed) break;
-            else robot.rotate(0); if(robot.buttonPressed) break; /* detection(curr); */ // caso en el que tenga que ir hacia atras en un dead end
+            else robot.rotate(0); if(robot.buttonPressed) break; /* detection(curr); */ // case in which the robot has to go backwards in a dead end
             robotOrientation = 0;
         } else if (next.y < robotCoord.y) {
-            // if(robotOrientation != 180) detection(curr); //caso en el que vaya solo hacia adelante
-            if(robotOrientation == 0) robot.rotate(90); if(robot.buttonPressed) break; /* detection(curr); */ robot.rotate(180); if(robot.buttonPressed) break; // caso en el que tenga que ir hacia atras en un dead end
-            else robot.rotate(180); if(robot.buttonPressed) break; /* detection(curr); */ // caso normal en el que tenga que seguir un caminio.
+            // if(robotOrientation != 180) detection(curr); //cases in which the robot has to turn 180 degrees to follow the path, so we want to detect before turning in case there is a victim in the current tile
+            if(robotOrientation == 0) robot.rotate(90); if(robot.buttonPressed) break; /* detection(curr); */ robot.rotate(180); if(robot.buttonPressed) break; // case in which the robot has to go backwards in a dead end
+            else robot.rotate(180); if(robot.buttonPressed) break; /* detection(curr); */ // normal case in which the robot has to follow a path
             robotOrientation = 180;
         }
         if(robot.buttonPressed) break;
@@ -90,7 +90,6 @@ void maze::dijkstra(coord& start, coord& end, arrCustom<coord>& tilesMap, arrCus
             if(robot.buttonPressed) break;
         }
         minDist = kMaxInt;
-        // robot.screenPrint("minDist: ");
         //find the minimum distance to the path line
         for(int i = 0; i < tilesMap.getSize(); i++){
             const coord& currentCoord = tilesMap.getValue(i);
@@ -107,11 +106,10 @@ void maze::dijkstra(coord& start, coord& end, arrCustom<coord>& tilesMap, arrCus
     current = end;
     while(current != start){
         if(robot.buttonPressed) break;
-        // robot.screenPrint("minDist2: ");
         path.push(current);
         current = previousPositions.getValue(tilesMap.getIndex(current));
     }
-    path.push(start); //para acceder la tile de inicio en el path. 
+    path.push(start); // to acces the start position in the followPath function
     // robot.screenPrint("Path found");
     followPath(path, tiles, tilesMap);
 }
@@ -161,11 +159,11 @@ void maze::dfs(arrCustom<coord>& visitedMap, arrCustom<Tile>& tiles, arrCustom<c
             // robot.screenPrint("LoP");      
             robotCoord = inicio;
             robotOrientation = 0;
-            // robot.screenPrint("Inicio");
+            // robot.screenPrint("START");
             bool braker=false;
             while(true){
                 Serial.println("wat");
-                // robot.screenPrint("Esperando");
+                // robot.screenPrint("waiting");
                 if(!robot.buttonPressed){
                     unsigned long time=millis();
                     while(digitalRead(Pins::checkpointPin)==1){
@@ -183,7 +181,6 @@ void maze::dfs(arrCustom<coord>& visitedMap, arrCustom<Tile>& tiles, arrCustom<c
                     }break;
                 }
             }
-            // robot.screenPrint("Dale");
             Serial.println("resetting visitedMap");
             visitedMap.reset();
             Serial.println("resetting tilesMap");
@@ -290,7 +287,7 @@ void maze::dfs(arrCustom<coord>& visitedMap, arrCustom<Tile>& tiles, arrCustom<c
                         }
                         if(!visitedFlag){ 
                             unvisited.push(next);
-                            // robot.screenPrint("Entre");
+                            // robot.screenPrint("visited: ");
                         }
                     }
                     
@@ -362,7 +359,7 @@ void maze::dfs(arrCustom<coord>& visitedMap, arrCustom<Tile>& tiles, arrCustom<c
     if(robot.buttonPressed==false) dijkstra(robotCoord, inicio, tilesMap, tiles); 
 }
 void maze::run_algs(){
-    // while(!robot.buttonPressed) /* robot.screenPrint("W Inicio"); */ 
+    // while(!robot.buttonPressed) /* robot.screenPrint("START"); */ 
     // robot.buttonPressed = !robot.buttonPressed;
     // robot.resetOrientation();
     arrCustom<coord> visitedMap(kMaxSize, kInvalidPosition);
