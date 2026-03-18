@@ -36,6 +36,7 @@ private:
     static constexpr uint8_t maxVlxDistance=68;
     static constexpr uint8_t brakingDis=2;
     static constexpr uint8_t kDistanceToWall=15;
+    static constexpr uint8_t kDistanceToObstacle = 27;
     //wheels
     static constexpr float wheelDiameter= 8.0;
     static constexpr float distancePerRev=wheelDiameter*PI;
