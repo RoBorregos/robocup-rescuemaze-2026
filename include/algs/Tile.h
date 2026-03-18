@@ -16,7 +16,7 @@ constexpr uint8_t kCheckpointBit = 7;
 constexpr uint8_t kNumberOfDirections = 4;
 
 constexpr uint8_t kWallTileWeight = 100; // max weight
-//constexpr uint8_t kBlackTileWeight = 100; // no pass
+constexpr uint8_t kBlackTileWeight = 100; // no pass
 constexpr uint8_t kWhiteTileWeight = 1;// min weight
 constexpr uint8_t kBlueTileWeight = 7; // 5 seconds - 3 tiles
 constexpr uint8_t kRampWeight = 7; 
