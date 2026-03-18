@@ -46,7 +46,7 @@ static uint32_t packetCounter = 0;
 static uint32_t lastPollMs = 0;
 static bool askRightNext = true;
 // Continuous polling
-// Estado del parser RX
+// status RX parser
 enum RxState : uint8_t {
 // RX parser state
   WAIT_AA,

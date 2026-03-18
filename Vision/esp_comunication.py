@@ -105,25 +105,6 @@ class Esp32():
         '''
         self.port.write(cmd)
     
-    def recv(self, timeout=0.5):
-        try:
-            timeout = min(timeout, self.timeout)
-            ''' This command should not be used on its own: it is called by the execute commands
-                below in a thread safe manner.  Note: we use read() instead of readline() since
-                readline() tends to return garbage characters from the Microcontroller
-            '''
-            c = ''
-            value = ''
-            attempts = 0
-            c = self.port.read(1)
-            while self.receiveFiniteStates(c) != 1:
-                c = self.port.read(1)
-                attempts += 1
-                if attempts * self.interCharTimeout > timeout:
-                    return 0
-            return 1
-        except:
-            self.reconnect()
     def receiveFiniteStates(self, rx_data):
         try:
             #self.log_file.write(f"Received byte: {bynascii.hexlify(rx_data).decode()}\n")
