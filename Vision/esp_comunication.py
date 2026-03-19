@@ -270,7 +270,9 @@ class Esp32():
         if not isinstance(text, str):
             text = str(text)
         payload = (text + "\n").encode("utf-8")
-        self.port.write(payload)
+        bytes_written = self.port.write(payload)
+        self.port.flush()
+        return bytes_written
 
 
 if __name__ == "__main__":
@@ -285,8 +287,8 @@ if __name__ == "__main__":
                 break
             if not line:
                 continue
-            esp.send_text_line(line)
-            print(f"Enviado: {line}")
+            bytes_written = esp.send_text_line(line)
+            print(f"Enviado ({bytes_written} bytes): {line}")
     except KeyboardInterrupt:
         pass
     finally:
