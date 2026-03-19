@@ -55,6 +55,23 @@ class VisionDetector:
         if isinstance(names, dict):
             print(f"[VISION] model classes={names}")
 
+        self._check_camera_reads()
+
+    def _check_camera_reads(self) -> None:
+        def test_cap(cap: cv2.VideoCapture, label: str) -> None:
+            if cap is None or not cap.isOpened():
+                print(f"[VISION] {label}: not opened")
+                return
+            ok_count = 0
+            for _ in range(5):
+                ok, frame = cap.read()
+                if ok and frame is not None:
+                    ok_count += 1
+            print(f"[VISION] {label}: warmup_reads_ok={ok_count}/5")
+
+        test_cap(self.cap_right, f"RIGHT(idx={self.cam_right_idx})")
+        test_cap(self.cap_left, f"LEFT(idx={self.cam_left_idx})")
+
     def _autodetect_cameras(self) -> None:
         available = []
         for index in range(0, 6):
@@ -108,23 +125,36 @@ class VisionDetector:
                 return VICTIM_NONE
             cap = fallback
 
-        ok, frame = cap.read()
-        if not ok or frame is None:
+        best_conf_global = -1.0
+        best_class_name = None
+
+        for _ in range(3):
+            ok, frame = cap.read()
+            if not ok or frame is None:
+                continue
+
+            results = self.model.predict(frame, conf=self.conf, imgsz=self.imgsz, verbose=False)
+            if not results:
+                continue
+
+            result = results[0]
+            boxes = result.boxes
+            names = result.names
+            if boxes is None or len(boxes) == 0:
+                continue
+
+            best_idx = int(boxes.conf.argmax().item())
+            best_conf = float(boxes.conf[best_idx].item())
+            class_id = int(boxes.cls[best_idx].item())
+            class_name = names.get(class_id, str(class_id)) if isinstance(names, dict) else str(class_id)
+
+            if best_conf > best_conf_global:
+                best_conf_global = best_conf
+                best_class_name = class_name
+
+        if best_class_name is None:
+            print(f"[VISION] no detections cam={'RIGHT' if camera_id == CAM_RIGHT else 'LEFT'}")
             return VICTIM_NONE
 
-        results = self.model.predict(frame, conf=self.conf, imgsz=self.imgsz, verbose=False)
-        if not results:
-            return VICTIM_NONE
-
-        result = results[0]
-        boxes = result.boxes
-        names = result.names
-        if boxes is None or len(boxes) == 0:
-            return VICTIM_NONE
-
-        best_idx = int(boxes.conf.argmax().item())
-        best_conf = float(boxes.conf[best_idx].item())
-        class_id = int(boxes.cls[best_idx].item())
-        class_name = names.get(class_id, str(class_id)) if isinstance(names, dict) else str(class_id)
-        print(f"[VISION] top_class={class_name} conf={best_conf:.3f}")
-        return self._class_to_victim_id(class_name)
+        print(f"[VISION] top_class={best_class_name} conf={best_conf_global:.3f}")
+        return self._class_to_victim_id(best_class_name)
