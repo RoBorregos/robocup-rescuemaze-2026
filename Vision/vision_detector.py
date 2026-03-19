@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
+
+# Avoid noisy/buggy obsensor probing on Raspberry Pi OpenCV builds
+os.environ.setdefault("OPENCV_VIDEOIO_PRIORITY_OBSENSOR", "0")
 
 import cv2
 from ultralytics import YOLO
@@ -41,8 +45,8 @@ class VisionDetector:
         self.cam_right_idx = getattr(Constants, "camera_right_index", 0)
         self.cam_left_idx = getattr(Constants, "camera_left_index", 1)
 
-        self.cap_right = cv2.VideoCapture(self.cam_right_idx)
-        self.cap_left = cv2.VideoCapture(self.cam_left_idx)
+        self.cap_right = self._open_capture(self.cam_right_idx)
+        self.cap_left = self._open_capture(self.cam_left_idx)
         self._configure_capture(self.cap_right)
         self._configure_capture(self.cap_left)
 
@@ -73,6 +77,7 @@ class VisionDetector:
                 return
             ok_count = 0
             for _ in range(5):
+                cv2.waitKey(1)
                 ok, frame = cap.read()
                 if ok and frame is not None:
                     ok_count += 1
@@ -84,7 +89,7 @@ class VisionDetector:
     def _autodetect_cameras(self) -> None:
         available = []
         for index in range(0, 6):
-            cap = cv2.VideoCapture(index)
+            cap = self._open_capture(index)
             if cap.isOpened():
                 ok, frame = cap.read()
                 if ok and frame is not None:
@@ -97,7 +102,7 @@ class VisionDetector:
         if not self.cap_right.isOpened():
             self.cap_right.release()
             self.cam_right_idx = available[0]
-            self.cap_right = cv2.VideoCapture(self.cam_right_idx)
+            self.cap_right = self._open_capture(self.cam_right_idx)
             self._configure_capture(self.cap_right)
 
         if not self.cap_left.isOpened():
@@ -106,8 +111,15 @@ class VisionDetector:
                 self.cam_left_idx = available[1]
             else:
                 self.cam_left_idx = available[0]
-            self.cap_left = cv2.VideoCapture(self.cam_left_idx)
+            self.cap_left = self._open_capture(self.cam_left_idx)
             self._configure_capture(self.cap_left)
+
+    def _open_capture(self, index: int) -> cv2.VideoCapture:
+        cap = cv2.VideoCapture(index, cv2.CAP_V4L2)
+        if not cap.isOpened():
+            cap.release()
+            cap = cv2.VideoCapture(index)
+        return cap
 
     def _configure_capture(self, cap: cv2.VideoCapture) -> None:
         if cap is None:
