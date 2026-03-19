@@ -274,7 +274,55 @@ class Esp32():
         self.port.flush()
         return bytes_written
     
-    def send_vision_packet(self, camera_id, victim_id):
+    def listen_and_respond(self):
+        """
+        Listen for ESP requests and respond with vision data
+        Runs in a loop - processes requests and sends responses
+        """
+        print("[LISTENER] Waiting for ESP requests...")
+        try:
+            while True:
+                # Check for incoming requests
+                if self.port.in_waiting > 0:
+                    data = self.port.read(self.port.in_waiting)
+                    
+                    # Parse request: 0xFF 0xAA 0x01 0x01 [CHECKSUM]
+                    if len(data) >= 5 and data[0] == 0xFF and data[1] == 0xAA and data[2] == 0x01 and data[3] == 0x01:
+                        print("[ESP REQUEST] Received data request")
+                        
+                        # Ask user for camera and victim
+                        print("\nEnter detection:")
+                        cam_input = input("Camera (0=RIGHT, 1=LEFT): ").strip()
+                        victim_input = input("Victim (1=PHI, 2=PSI, 3=OMEGA): ").strip()
+                        
+                        try:
+                            camera_id = int(cam_input)
+                            victim_id = int(victim_input)
+                            
+                            if camera_id not in {0, 1}:
+                                print("Invalid camera ID")
+                                continue
+                            if victim_id not in {1, 2, 3}:
+                                print("Invalid victim ID")
+                                continue
+                            
+                            # Send response
+                            self.send_vision_packet(camera_id, victim_id)
+                            print(f"[SENT] Camera={camera_id}, Victim={victim_id}")
+                            
+                            # Wait for ACK
+                            import time
+                            time.sleep(0.5)
+                            if self.port.in_waiting > 0:
+                                ack_data = self.port.read(self.port.in_waiting)
+                                if len(ack_data) >= 6 and ack_data[0] == 0xFF and ack_data[1] == 0xAA:
+                                    print("[ACK RECEIVED] Data delivered successfully!")
+                        except ValueError:
+                            print("Invalid input")
+        except KeyboardInterrupt:
+            print("\n[LISTENER] Stopped")
+        except Exception as e:
+            print(f"[ERROR] {e}")
         """
         Send binary vision packet: 0xFF 0xAA [LEN] [CAMERA] [VICTIM] [CHECKSUM]
         camera_id: 0=RIGHT, 1=LEFT
@@ -300,53 +348,9 @@ class Esp32():
 if __name__ == "__main__":
     esp = Esp32()
     esp.connect()
-    print("\n=== Vision Packet Sender ===")
-    print("Cameras: 0=RIGHT, 1=LEFT")
-    print("Victims: 0=NONE, 1=PHI, 2=PSI, 3=OMEGA")
-    print("Usage: VISION <camera> <victim>")
-    print("Example: VISION 0 2  (RIGHT camera, PSI victim)")
-    print("Commands: q/quit/exit -> Exit")
-    print()
-
-    try:
-        while True:
-            line = input("> ").strip()
-            if line.lower() in {"q", "quit", "exit"}:
-                break
-            if not line:
-                continue
-            
-            if line.upper().startswith("VISION"):
-                parts = line.split()
-                if len(parts) == 3:
-                    try:
-                        camera_id = int(parts[1])
-                        victim_id = int(parts[2])
-                        
-                        if camera_id not in {0, 1}:
-                            print("Camera ID must be 0 (RIGHT) or 1 (LEFT)")
-                            continue
-                        if victim_id not in {0, 1, 2, 3}:
-                            print("Victim ID must be 0 (NONE), 1 (PHI), 2 (PSI), or 3 (OMEGA)")
-                            continue
-                        
-                        bytes_written = esp.send_vision_packet(camera_id, victim_id)
-                        
-                        victim_names = {0: "NONE", 1: "PHI", 2: "PSI", 3: "OMEGA"}
-                        camera_names = {0: "RIGHT", 1: "LEFT"}
-                        print(f"Packet sent ({bytes_written} bytes): {camera_names[camera_id]} + {victim_names[victim_id]}")
-                    except ValueError:
-                        print("Usage: VISION <camera> <victim>")
-                else:
-                    print("Usage: VISION <camera> <victim>")
-            else:
-                # Send as text
-                bytes_written = esp.send_text_line(line)
-                print(f"Text sent ({bytes_written} bytes): {line}")
-    except KeyboardInterrupt:
-        print("\nInterrupted")
-    finally:
-        try:
-            esp.close()
-        except Exception:
-            pass
+    print("\n=== Vision System - Listener Mode ===")
+    print("ESP32 will request data every 2 seconds")
+    print("You will be prompted to enter camera and victim")
+    print("Press Ctrl+C to exit\n")
+    
+    esp.listen_and_respond()

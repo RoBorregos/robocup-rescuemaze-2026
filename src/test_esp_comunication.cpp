@@ -38,6 +38,10 @@ static uint8_t lastCamId = CAM_RIGHT;
 static uint8_t lastVictimId = VICTIM_NONE;
 static uint32_t packetCounter = 0;
 
+// Polling timer
+static uint32_t lastRequestMs = 0;
+static const uint32_t REQUEST_INTERVAL_MS = 2000;  // Ask every 2 seconds
+
 // RX parser state
 enum RxState : uint8_t {
   WAIT_FF,
@@ -165,6 +169,29 @@ void handlePacket(uint8_t len, const uint8_t* payload) {
   renderOled();
 
   doAction(camId, victimId);
+  
+  // Send ACK (acknowledgment) back to Raspberry Pi
+  // Format: 0xFF 0xAA 0x02 [STATUS] 0x00 [CHECKSUM]
+  // STATUS: 0 = OK/received
+  uint8_t ack_packet[6] = {0xFF, 0xAA, 0x02, 0x00, 0x00, 0x02};  // Checksum: 0x02+0x00+0x00=0x02
+  Serial.write(ack_packet, sizeof(ack_packet));
+  Serial.flush();
+  
+  if (ENABLE_DEBUG_LOGS) {
+    Serial.println("[ESP->HOST] ACK sent (DELIVERED)");
+  }
+}
+
+void sendRequest() {
+  // Request format: 0xFF 0xAA 0x01 0x01 0x01
+  // HEADER0=0xFF, HEADER1=0xAA, LEN=0x01, CMD=0x01(REQUEST), CHECKSUM=0x02
+  uint8_t request[5] = {0xFF, 0xAA, 0x01, 0x01, 0x02};
+  Serial.write(request, sizeof(request));
+  Serial.flush();
+  
+  if (ENABLE_DEBUG_LOGS) {
+    Serial.println("[ESP->HOST] REQUEST sent");
+  }
 }
 
 void parseIncomingByte(uint8_t b) {
@@ -249,6 +276,13 @@ void setup() {
 }
 
 void loop() {
+  // Periodically request data from Raspberry Pi
+  const uint32_t now = millis();
+  if (now - lastRequestMs >= REQUEST_INTERVAL_MS) {
+    lastRequestMs = now;
+    sendRequest();
+  }
+  
   // Process incoming bytes from Raspberry Pi
   while (Serial.available() > 0) {
     uint8_t b = (uint8_t)Serial.read();
