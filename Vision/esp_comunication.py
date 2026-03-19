@@ -273,12 +273,40 @@ class Esp32():
         bytes_written = self.port.write(payload)
         self.port.flush()
         return bytes_written
+    
+    def send_vision_packet(self, camera_id, victim_id):
+        """
+        Send binary vision packet: 0xFF 0xAA [LEN] [CAMERA] [VICTIM] [CHECKSUM]
+        camera_id: 0=RIGHT, 1=LEFT
+        victim_id: 0=NONE, 1=PHI, 2=PSI, 3=OMEGA
+        Example: send_vision_packet(0, 2)  # Send camera=RIGHT, victim=PSI
+        """
+        packet_len = 2  # CAMERA + VICTIM
+        checksum = (packet_len + camera_id + victim_id) & 0xFF
+        
+        packet = struct.pack("BBBBBB", 
+                            0xFF,        # HEADER0
+                            0xAA,        # HEADER1
+                            packet_len,  # Length
+                            camera_id,   # Camera (0=RIGHT, 1=LEFT)
+                            victim_id,   # Victim (0=NONE, 1=PHI, 2=PSI, 3=OMEGA)
+                            checksum)    # Checksum
+        
+        bytes_written = self.port.write(packet)
+        self.port.flush()
+        return bytes_written
 
 
 if __name__ == "__main__":
     esp = Esp32()
     esp.connect()
-    print("Modo texto activo. Escribe algo para enviar al ESP32 (q para salir).")
+    print("\n=== Vision Packet Sender ===")
+    print("Cameras: 0=RIGHT, 1=LEFT")
+    print("Victims: 0=NONE, 1=PHI, 2=PSI, 3=OMEGA")
+    print("Usage: VISION <camera> <victim>")
+    print("Example: VISION 0 2  (RIGHT camera, PSI victim)")
+    print("Commands: q/quit/exit -> Exit")
+    print()
 
     try:
         while True:
@@ -287,10 +315,36 @@ if __name__ == "__main__":
                 break
             if not line:
                 continue
-            bytes_written = esp.send_text_line(line)
-            print(f"Enviado ({bytes_written} bytes): {line}")
+            
+            if line.upper().startswith("VISION"):
+                parts = line.split()
+                if len(parts) == 3:
+                    try:
+                        camera_id = int(parts[1])
+                        victim_id = int(parts[2])
+                        
+                        if camera_id not in {0, 1}:
+                            print("Camera ID must be 0 (RIGHT) or 1 (LEFT)")
+                            continue
+                        if victim_id not in {0, 1, 2, 3}:
+                            print("Victim ID must be 0 (NONE), 1 (PHI), 2 (PSI), or 3 (OMEGA)")
+                            continue
+                        
+                        bytes_written = esp.send_vision_packet(camera_id, victim_id)
+                        
+                        victim_names = {0: "NONE", 1: "PHI", 2: "PSI", 3: "OMEGA"}
+                        camera_names = {0: "RIGHT", 1: "LEFT"}
+                        print(f"Packet sent ({bytes_written} bytes): {camera_names[camera_id]} + {victim_names[victim_id]}")
+                    except ValueError:
+                        print("Usage: VISION <camera> <victim>")
+                else:
+                    print("Usage: VISION <camera> <victim>")
+            else:
+                # Send as text
+                bytes_written = esp.send_text_line(line)
+                print(f"Text sent ({bytes_written} bytes): {line}")
     except KeyboardInterrupt:
-        pass
+        print("\nInterrupted")
     finally:
         try:
             esp.close()

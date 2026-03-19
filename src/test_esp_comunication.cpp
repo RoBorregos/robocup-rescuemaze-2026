@@ -1,11 +1,11 @@
-#if 0
+#if 1
 #include <Arduino.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
 static const uint32_t LINK_BAUD = 115200;
-static const bool ENABLE_DEBUG_LOGS = false;
+static const bool ENABLE_DEBUG_LOGS = true;
 
 static const uint8_t OLED_SDA_PIN = 21;
 static const uint8_t OLED_SCL_PIN = 22;
@@ -22,61 +22,52 @@ static const uint8_t STATUS_LED_PIN = 2;
 static const uint8_t STATUS_LED_PIN = LED_BUILTIN;
 #endif
 
-// ----- Protocolo -----
+// ----- Protocol -----
 static const uint8_t HEADER0 = 0xFF;
 static const uint8_t HEADER1 = 0xAA;
-
-static const uint8_t CMD_REQUEST_RIGHT = 0x02;
-static const uint8_t CMD_REQUEST_LEFT  = 0x03;
 
 static const uint8_t CAM_RIGHT = 0;
 static const uint8_t CAM_LEFT  = 1;
 
 static const uint8_t VICTIM_NONE  = 0x00;
-static const uint8_t VICTIM_PHI   = 0x01; // phi
-static const uint8_t VICTIM_PSI   = 0x02; // psi
-static const uint8_t VICTIM_OMEGA = 0x03; // omega
+static const uint8_t VICTIM_PHI   = 0x01; // phi (Φ)
+static const uint8_t VICTIM_PSI   = 0x02; // psi (Ψ)
+static const uint8_t VICTIM_OMEGA = 0x03; // omega (Ω)
 
-static uint8_t lastRequestedCmd = CMD_REQUEST_RIGHT;
 static uint8_t lastCamId = CAM_RIGHT;
 static uint8_t lastVictimId = VICTIM_NONE;
 static uint32_t packetCounter = 0;
 
-// Polling continuo
-// ----- Protocol -----
-static uint32_t lastPollMs = 0;
-static bool askRightNext = true;
-// Continuous polling
-// status RX parser
-enum RxState : uint8_t {
 // RX parser state
+enum RxState : uint8_t {
+  WAIT_FF,
   WAIT_AA,
   WAIT_LEN,
-  // Put your real "do X action" here.
-  // For now we keep an example action with LED and logs.
+  WAIT_PAYLOAD,
+  WAIT_CHECK,
 };
-  // Example: number of blinks by victim type
+
 static RxState rxState = WAIT_FF;
 static uint8_t rxLen = 0;
 static uint8_t rxPayload[16];
 static uint8_t rxIndex = 0;
-      Serial.print("[RX] invalid len: ");
+static uint8_t rxChecksum = 0;
 
 const char* cameraLabel(uint8_t camId) {
   if (camId == CAM_RIGHT) return "RIGHT";
   if (camId == CAM_LEFT) return "LEFT";
-  return "UNKNOWN_CAM";
+  return "UNKNOWN";
 }
 
-      Serial.print("[RX] invalid cam_id: ");
+const char* victimLabel(uint8_t victimId) {
   switch (victimId) {
     case VICTIM_NONE:  return "N";
     case VICTIM_PHI:   return "PHI";
     case VICTIM_PSI:   return "PSI";
     case VICTIM_OMEGA: return "OMEGA";
-    default:           return "UNKNOWN_VICTIM";
+    default:           return "UNKNOWN";
   }
-      Serial.print("[RX] invalid victim_id: ");
+}
 
 void renderOled() {
   if (!oledReady) {
@@ -85,38 +76,24 @@ void renderOled() {
 
   oled.clearDisplay();
   oled.setTextColor(SSD1306_WHITE);
-
-          Serial.print("[RX] invalid checksum. expected=0x");
-  oled.setCursor(0, 6);
-          Serial.print(" received=0x");
+  
+  oled.setTextSize(1);
+  oled.setCursor(0, 0);
+  oled.print("CAM: ");
+  oled.println(cameraLabel(lastCamId));
+  
+  oled.setCursor(0, 10);
+  oled.print("PKT: ");
+  oled.println(packetCounter);
 
   oled.setTextSize(3);
   oled.setCursor(0, 34);
   oled.println(victimLabel(lastVictimId));
-
-  // 1) Continuous polling (ESP always requests)
-}
-
-  // 2) Process incoming bytes
-  const uint8_t len = 0x01;
-  const uint8_t checksum = (uint8_t)((len + cmd) & 0xFF);
-
-  uint8_t pkt[5] = {HEADER0, HEADER1, len, cmd, checksum};
-  Serial.write(pkt, sizeof(pkt));
-  lastRequestedCmd = cmd;
-  renderOled();
-
-  if (ENABLE_DEBUG_LOGS) {
-    Serial.print("[ESP->HOST] request cmd=0x");
-    Serial.print(cmd, HEX);
-    Serial.print(" (");
-    Serial.print((cmd == CMD_REQUEST_RIGHT) ? "RIGHT" : "LEFT");
-    Serial.println(")");
-  }
+  
+  oled.display();
 }
 
 void doAction(uint8_t camId, uint8_t victimId) {
-
   if (ENABLE_DEBUG_LOGS) {
     Serial.print("[ACTION] cam=");
     Serial.print(camId);
@@ -146,7 +123,7 @@ void doAction(uint8_t camId, uint8_t victimId) {
 void handlePacket(uint8_t len, const uint8_t* payload) {
   if (len != 2) {
     if (ENABLE_DEBUG_LOGS) {
-      Serial.print("[RX] len invalido: ");
+      Serial.print("[RX] len invalid: ");
       Serial.println(len);
     }
     return;
@@ -157,7 +134,7 @@ void handlePacket(uint8_t len, const uint8_t* payload) {
 
   if (camId != CAM_RIGHT && camId != CAM_LEFT) {
     if (ENABLE_DEBUG_LOGS) {
-      Serial.print("[RX] cam_id invalido: ");
+      Serial.print("[RX] cam_id invalid: ");
       Serial.println(camId);
     }
     return;
@@ -165,7 +142,7 @@ void handlePacket(uint8_t len, const uint8_t* payload) {
 
   if (victimId > VICTIM_OMEGA) {
     if (ENABLE_DEBUG_LOGS) {
-      Serial.print("[RX] victim_id invalido: ");
+      Serial.print("[RX] victim_id invalid: ");
       Serial.println(victimId);
     }
     return;
@@ -231,9 +208,9 @@ void parseIncomingByte(uint8_t b) {
         handlePacket(rxLen, rxPayload);
       } else {
         if (ENABLE_DEBUG_LOGS) {
-          Serial.print("[RX] checksum invalido. esperado=0x");
+          Serial.print("[RX] checksum invalid. expected=0x");
           Serial.print(rxChecksum, HEX);
-          Serial.print(" recibido=0x");
+          Serial.print(" received=0x");
           Serial.println(b, HEX);
         }
       }
@@ -256,10 +233,7 @@ void setup() {
     oled.setTextSize(2);
     oled.setTextColor(SSD1306_WHITE);
     oled.setCursor(0, 0);
-    oled.println("WAIT");
-    oled.setTextSize(3);
-    oled.setCursor(0, 28);
-    oled.println("N");
+    oled.println("READY");
     oled.display();
     delay(400);
   }
@@ -267,22 +241,15 @@ void setup() {
   renderOled();
 
   if (ENABLE_DEBUG_LOGS) {
-    Serial.println("ESP Serial Polling Test");
-    Serial.print("Link Serial ");
+    Serial.println("==== Vision Packet Receiver ====");
+    Serial.print("Baud: ");
     Serial.println(LINK_BAUD);
+    Serial.println("Waiting for packets (0xFF 0xAA [LEN] [CAM] [VICTIM] [CHECKSUM])...");
   }
 }
 
 void loop() {
-  const uint32_t now = millis();
-  if (now - lastPollMs >= POLL_INTERVAL_MS) {
-    lastPollMs = now;
-    const uint8_t cmd = askRightNext ? CMD_REQUEST_RIGHT : CMD_REQUEST_LEFT;
-    askRightNext = !askRightNext;
-    sendRequest(cmd);
-  }
-
-    // Polling loop
+  // Process incoming bytes from Raspberry Pi
   while (Serial.available() > 0) {
     uint8_t b = (uint8_t)Serial.read();
     parseIncomingByte(b);
