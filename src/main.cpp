@@ -3,14 +3,14 @@
 #include "Test.h"
 #include "motors.h"
 #include "Pins_ID.h"
-#include "RightHand.h"
+#include "raspy.h"
 
 
 SemaphoreHandle_t i2cSemaphore;
+static constexpr uint32_t kVlxTaskDelayMs = 40;
 
 void VLXTaskPriority1(void *pv);
 void VLXTaskPriority2(void *pv);
-void RightHandNavigationTask(void *pv);
 
 int servopos = 0;
 
@@ -34,8 +34,9 @@ void setup() {
   Serial.println("Semaphore created successfully.");
   delay(500);
   robot.resetOrientation();
+  raspyLink.setup();
   
-  if (robot.innit == true) {    
+  if (true) {
     BaseType_t result1 = xTaskCreatePinnedToCore(
       VLXTaskPriority1, 
       "VLXTaskPriority1", 
@@ -61,24 +62,9 @@ void setup() {
     if (result2 != pdPASS) {
       Serial.println("ERROR: Couldn't create VLXTaskPriority2");
     }
-    
-    
-    BaseType_t result4 = xTaskCreatePinnedToCore(
-      RightHandNavigationTask, 
-      "RightHandNav", 
-      6144,
-      NULL, 
-      3, 
-      NULL, 
-      0
-    );
-    if (result4 != pdPASS) {
-      Serial.println("ERROR: Couldn't create RightHandNavigationTask");
-    }
-    
     Serial.println("All tasks created successfully.");
   } else {
-    Serial.println("ERROR: robot.innit = false");
+    Serial.println("ERROR: setup skipped");
   }
 }
 
@@ -92,7 +78,7 @@ void VLXTaskPriority1(void *pv) {
     } else {
       Serial.println("WARN: VLXTask1 timeout in semaphore");
     }
-    vTaskDelay(pdMS_TO_TICKS(vDelay));
+    vTaskDelay(pdMS_TO_TICKS(kVlxTaskDelayMs));
   }
 }
 
@@ -106,33 +92,11 @@ void VLXTaskPriority2(void *pv) {
     } else {
       Serial.println("WARN: VLXTask2 timeout in semaphore");
     }
-    vTaskDelay(pdMS_TO_TICKS(vDelay));
+    vTaskDelay(pdMS_TO_TICKS(kVlxTaskDelayMs));
   }
 }
 
-void RightHandNavigationTask(void *pv) {
-  vTaskDelay(pdMS_TO_TICKS(3000));
-  
-  Serial.println("\n*** Right Hand Rule ***\n");
-  
-  while (true) {
-  
-    Serial.println("\n--- Current reading ---");
-    Serial.print("Front L: "); Serial.print(robot.vlx[vlxID::frontLeft].getDistance());
-    Serial.print(" cm | Front R: "); Serial.print(robot.vlx[vlxID::frontRight].getDistance());
-    Serial.println(" cm");
-    Serial.print("Right: "); Serial.print(robot.vlx[vlxID::rightUp].getDistance());
-    Serial.print(" cm | Left: "); Serial.print(robot.vlx[vlxID::leftUp].getDistance());
-    Serial.println(" cm");
-    Serial.print("Back: "); Serial.print(robot.vlx[vlxID::back].getDistance());
-    Serial.println(" cm");
-
-    rightHandRule(); //comment out if not using
-    
-    vTaskDelay(pdMS_TO_TICKS(800));
-  }
-}
 
 void loop() {
-
+  raspyLink.getDetection();
 }
