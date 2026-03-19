@@ -14,12 +14,13 @@ Raspy::Raspy() {
 }
 
 void Raspy::sendRequest(uint8_t camera_id) {
-  // Send request: 0xFF 0xAA 0x01 0x01 [CHECKSUM]
+  // Send request: 0xFF 0xAA 0x02 0x01 [CAMERA] [CHECKSUM]
   Serial.write(0xFF);
   Serial.write(0xAA);
-  Serial.write(0x01);      // Length
+  Serial.write(0x02);      // Length (command + camera)
   Serial.write(0x01);      // Request command
-  Serial.write(0x02);      // Checksum (0x01 + 0x01)
+  Serial.write(camera_id); // Camera: 0=RIGHT, 1=LEFT
+  Serial.write((uint8_t)(0x03 + camera_id)); // checksum = len + cmd + camera
   Serial.flush();
 }
 
