@@ -1,6 +1,7 @@
 #include "motors.h"
 #include "Pins_ID.h"
 #include <WiFi.h>
+#include "Encoder.h"
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 motors::motors(){
@@ -19,9 +20,9 @@ void motors::setupMotors(){
     //screenBegin();
     //screenPrint("r");
     bno.setupBNO();
-    setupVlx(vlxID::leftUp);
+    setupVlx(vlxID::left);
     setupVlx(vlxID::frontRight);
-    setupVlx(vlxID::rightUp);
+    setupVlx(vlxID::right);
     setupVlx(vlxID::frontLeft);
     setupVlx(vlxID::back);
     //setupTCS();
@@ -188,10 +189,12 @@ void motors::checkTileColor(){
 }
 
 float motors::nearWall(){
-    if(vlx[vlxID::leftUp].getDistance()<minDisToLateralWall ){
+    //float left = AverageLeftDistance();
+    //float right = AverageRightDistance();
+    if(vlx[vlxID::left].getDistance()<minDisToLateralWall ){
         changeAngle=maxChangeAngle;
     }
-    else if(vlx[vlxID::rightUp].getDistance()<minDisToLateralWall){
+    else if(vlx[vlxID::right].getDistance()<minDisToLateralWall){
         changeAngle=-maxChangeAngle;
     }else{
         changeAngle=0;
@@ -449,14 +452,46 @@ void motors::setupVlx(const uint8_t index) {
 void motors::resetVlx() {
     screenBegin();
     setupVlx(vlxID::frontLeft);
-    setupVlx(vlxID::leftUp);
+    setupVlx(vlxID::left);
     //|setupVlx(vlxID::leftDown);
     //setupVlx(vlxID::front);
     setupVlx(vlxID::frontRight);
-    setupVlx(vlxID::rightUp);
+    setupVlx(vlxID::right);
     setupVlx(vlxID::back);
 }
 
+/*
+float motors::AverageLeftDistance(){
+    float frontLeftDistance=vlx[vlxID::frontLeft].getDistance();
+    float leftDistance=vlx[vlxID::left].getDistance();
+
+    if (frontLeftDistance <= maxVlxDistance && leftDistance <= maxVlxDistance) {
+        return (frontLeftDistance+leftDistance)/2;
+    } else if (frontLeftDistance > maxVlxDistance && leftDistance <= maxVlxDistance) {
+        return leftDistance;
+    } else if (frontLeftDistance <= maxVlxDistance && leftDistance > maxVlxDistance) {
+        return frontLeftDistance;
+    }
+    else {
+        return maxVlxDistance;
+    }
+}
+float motors::AverageRightDistance(){
+    float rightDownDistance=vlx[vlxID::rightDown].getDistance();
+    float rightDistance=vlx[vlxID::right].getDistance();
+
+    if (rightDownDistance <= maxVlxDistance && rightDistance <= maxVlxDistance) {
+        return (rightDownDistance+rightDistance)/2;
+    } else if (rightDownDistance > maxVlxDistance && rightDistance <= maxVlxDistance) {
+        return rightDistance;
+    } else if (rightDownDistance <= maxVlxDistance && rightDistance > maxVlxDistance) {
+        return rightDownDistance;
+    }
+    else {
+        return maxVlxDistance;
+    }
+}
+*/
 bool motors::isWall(uint8_t direction){
     uint8_t relativeDir;
     int deltaTargetAngle=static_cast<int>(targetAngle);
@@ -485,13 +520,13 @@ bool motors::isWall(uint8_t direction){
             wall1=vlx[vlxID::frontLeft].isWall() && vlx[vlxID::frontRight].isWall();
             return wall1;
         case 1:
-            wall2=vlx[vlxID::rightUp].isWall();
+            wall2=vlx[vlxID::right].isWall();
             return wall2;
         case 2:
             wall3=vlx[vlxID::back].isWall();
             return wall3;
         case 3:
-            wall4=vlx[vlxID::leftUp].isWall();
+            wall4=vlx[vlxID::left].isWall();
             return wall4;
         default: 
           return false;
@@ -534,11 +569,11 @@ void motors::ramp(){
             stop();break;
         }
         float error;
-        vlx[vlxID::rightUp].getDistance();
-        vlx[vlxID::leftUp].getDistance();
-        if((vlx[vlxID::rightUp].distance<vlx[vlxID::rightUp].kDistanceToWall && vlx[vlxID::leftUp].distance<vlx[vlxID::leftUp].kDistanceToWall) &&
-        (vlx[vlxID::rightUp].distance<6 || vlx[vlxID::leftUp].distance<6)){
-            error=rampUpPID.calculate_PID(0,(vlx[vlxID::rightUp].distance-vlx[vlxID::leftUp].distance));
+        vlx[vlxID::right].getDistance();
+        vlx[vlxID::left].getDistance();
+        if((vlx[vlxID::right].distance<vlx[vlxID::right].kDistanceToWall && vlx[vlxID::left].distance<vlx[vlxID::left].kDistanceToWall) &&
+        (vlx[vlxID::right].distance<6 || vlx[vlxID::left].distance<6)){
+            error=rampUpPID.calculate_PID(0,(vlx[vlxID::right].distance-vlx[vlxID::left].distance));
             error=constrain(error,-15,15);
             PID_Wheel(kSpeedRampUp-error,MotorID::kFrontLeft);
             PID_Wheel(kSpeedRampUp-error,MotorID::kBackLeft);
@@ -555,11 +590,11 @@ void motors::ramp(){
         // limitCrash();
         if(limitColition==true) break;
         float error;
-        vlx[vlxID::rightUp].getDistance();
-        vlx[vlxID::leftUp].getDistance();
-        if((vlx[vlxID::rightUp].distance<vlx[vlxID::rightUp].kDistanceToWall && vlx[vlxID::leftUp].distance<vlx[vlxID::leftUp].kDistanceToWall) &&
-        (vlx[vlxID::rightUp].distance<6 || vlx[vlxID::leftUp].distance<6)){
-            error=rampDownPID.calculate_PID(0,(vlx[vlxID::rightUp].distance-vlx[vlxID::leftUp].distance));
+        vlx[vlxID::right].getDistance();
+        vlx[vlxID::left].getDistance();
+        if((vlx[vlxID::right].distance<vlx[vlxID::right].kDistanceToWall && vlx[vlxID::left].distance<vlx[vlxID::left].kDistanceToWall) &&
+        (vlx[vlxID::right].distance<6 || vlx[vlxID::left].distance<6)){
+            error=rampDownPID.calculate_PID(0,(vlx[vlxID::right].distance-vlx[vlxID::left].distance));
             error=constrain(error,-6,6);
             PID_Wheel(kSpeedRampDown-error,MotorID::kFrontLeft);
             PID_Wheel(kSpeedRampDown-error,MotorID::kBackLeft);

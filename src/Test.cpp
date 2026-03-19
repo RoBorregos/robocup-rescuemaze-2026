@@ -42,21 +42,21 @@ void testVlxFrontRigth(){
     //robot.screenPrint(print);
 
 }
-void testVlxRightUp(){
-    float distance=robot.vlx[vlxID::rightUp].getDistance();
+void testVlxRight(){
+    float distance=robot.vlx[vlxID::right].getDistance();
     Serial.println(distance);
     String print=static_cast<String>(distance);
     //robot.screenPrint(print);
 
 }
 void testVlxLeft(){
-    float distance=robot.vlx[vlxID::leftUp].getDistance();
+    float distance=robot.vlx[vlxID::left].getDistance();
     Serial.println(distance);
     String print=static_cast<String>(distance);
     //robot.screenPrint(print);
 }
 void testVlxrightDown(){
-    float distance=robot.vlx[vlxID::rightUp].getDistance();
+    float distance=robot.vlx[vlxID::right].getDistance();
     Serial.println(distance);
     String print=static_cast<String>(distance);
     //robot.screenPrint(print);

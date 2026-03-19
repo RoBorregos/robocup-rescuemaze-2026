@@ -22,6 +22,7 @@ public:
     VL53L0X_RangingMeasurementData_t measure;
     void updateDistance();
     float getDistance();
+    void printDistance();
     VLX();
     VLX(int,int);
     bool isWall();

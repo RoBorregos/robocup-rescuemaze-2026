@@ -10,7 +10,7 @@ void testVlxLeft();
 void testVlxBackLeft();
 void testVlxFront();
 void testVlxrightDown();
-void testVlxRightUp();
+void testVlxRight();
 void testMotors();
 void testTCS();
 void testEncoders();

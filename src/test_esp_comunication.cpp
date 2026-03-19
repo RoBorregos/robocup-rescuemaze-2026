@@ -1,3 +1,4 @@
+#if 0
 #include <Arduino.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
@@ -287,3 +288,4 @@ void loop() {
     parseIncomingByte(b);
   }
 }
+#endif
