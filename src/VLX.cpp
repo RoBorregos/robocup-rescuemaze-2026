@@ -36,6 +36,7 @@ float VLX::getDistance(){
         return distance;
         }
     }
+    return distance;
 }
 
 void VLX::printDistance(){ 
