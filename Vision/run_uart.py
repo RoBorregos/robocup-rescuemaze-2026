@@ -6,7 +6,7 @@ Creates the ESP32 service, opens serial communication, and keeps
 the request/response loop alive.
 """
 
-from vision_service import Esp32Service
+from service import Esp32Service
 
 
 def main() -> None:

@@ -19,7 +19,7 @@ import cv2
 from ultralytics import YOLO
 
 import Constants
-from vision_protocol import (
+from protocol import (
     CAM_LEFT,
     CAM_RIGHT,
     VICTIM_NONE,
@@ -259,12 +259,12 @@ class VisionDetector:
 
     def read_frame(self, camera_id: int):
         if camera_id == CAM_RIGHT and self.picam_right is not None:
-                try:
-                    frame = self.picam_right.capture_array()
-                    if frame is not None:
-                        return True, cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-                except Exception:
-                    pass
+            try:
+                frame = self.picam_right.capture_array()
+                if frame is not None:
+                    return True, cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+            except Exception:
+                pass
             if self.cap_right is not None:
                 return self.cap_right.read()
             return False, None

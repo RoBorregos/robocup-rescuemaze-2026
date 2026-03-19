@@ -13,8 +13,8 @@ from serial import Serial
 from serial.serialutil import SerialException
 
 import Constants
-from vision_detector import VisionDetector
-from vision_protocol import (
+from detector import VisionDetector
+from protocol import (
     PacketReader,
     build_vision_packet,
     camera_name,
