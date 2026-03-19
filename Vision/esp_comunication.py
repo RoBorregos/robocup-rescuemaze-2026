@@ -60,7 +60,7 @@ class Esp32():
                 self.port = Serial(port=self.port, baudrate=self.baudrate, timeout=self.timeout, writeTimeout=self.writeTimeout)
                 # The next line is necessary to give the firmware time to wake up.
                 time.sleep(1)
-                print("Connected")
+                print("conectado")
                 # state_, val = self.get_baud()
                 # if val != self.baudrate:
                 #     time.sleep(1)
@@ -80,7 +80,7 @@ class Esp32():
                 self.port = Serial(port=self.port_name, baudrate=self.baudrate, timeout=self.timeout, writeTimeout=self.writeTimeout)
                 # The next line is necessary to give the firmware time to wake up.
                 time.sleep(1)
-                print("Connected")
+                print("conectado")
                 break
             except:
                 print("Serial Exception:")
@@ -105,6 +105,25 @@ class Esp32():
         '''
         self.port.write(cmd)
     
+    def recv(self, timeout=0.5):
+        try:
+            timeout = min(timeout, self.timeout)
+            ''' This command should not be used on its own: it is called by the execute commands
+                below in a thread safe manner.  Note: we use read() instead of readline() since
+                readline() tends to return garbage characters from the Microcontroller
+            '''
+            c = ''
+            value = ''
+            attempts = 0
+            c = self.port.read(1)
+            while self.receiveFiniteStates(c) != 1:
+                c = self.port.read(1)
+                attempts += 1
+                if attempts * self.interCharTimeout > timeout:
+                    return 0
+            return 1
+        except:
+            self.reconnect()
     def receiveFiniteStates(self, rx_data):
         try:
             #self.log_file.write(f"Received byte: {bynascii.hexlify(rx_data).decode()}\n")
@@ -209,7 +228,7 @@ class Esp32():
         
         self.mutex.release()
         return 1
-# Main function
+#Main funtion
     def sentDetection(self):
         self.recv()
         if self.payload_ack==b'\x02':
@@ -239,3 +258,32 @@ class Esp32():
         else:
             # print("ACK", self.payload_ack, self.payload_ack == b'\x00', self.execute(cmd_str)==1)
             return self.FAIL, 0
+
+    def send_text_line(self, text):
+        if not isinstance(text, str):
+            text = str(text)
+        payload = (text + "\n").encode("utf-8")
+        self.port.write(payload)
+
+
+if __name__ == "__main__":
+    esp = Esp32()
+    esp.connect()
+    print("Modo texto activo. Escribe algo para enviar al ESP32 (q para salir).")
+
+    try:
+        while True:
+            line = input("> ").strip()
+            if line.lower() in {"q", "quit", "exit"}:
+                break
+            if not line:
+                continue
+            esp.send_text_line(line)
+            print(f"Enviado: {line}")
+    except KeyboardInterrupt:
+        pass
+    finally:
+        try:
+            esp.close()
+        except Exception:
+            pass
