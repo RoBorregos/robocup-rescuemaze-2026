@@ -40,7 +40,7 @@ static uint32_t packetCounter = 0;
 
 // Polling timer
 static uint32_t lastRequestMs = 0;
-static const uint32_t REQUEST_INTERVAL_MS = 2000;  // Ask every 2 seconds
+static const uint32_t REQUEST_INTERVAL_MS = 5000;  // Ask every 5 seconds (increased for input time)
 
 // RX parser state
 enum RxState : uint8_t {

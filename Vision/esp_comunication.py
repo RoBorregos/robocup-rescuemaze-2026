@@ -274,12 +274,35 @@ class Esp32():
         self.port.flush()
         return bytes_written
     
+    def send_vision_packet(self, camera_id, victim_id):
+        """
+        Send binary vision packet: 0xFF 0xAA [LEN] [CAMERA] [VICTIM] [CHECKSUM]
+        camera_id: 0=RIGHT, 1=LEFT
+        victim_id: 1=PHI, 2=PSI, 3=OMEGA
+        Example: send_vision_packet(0, 2)  # Send camera=RIGHT, victim=PSI
+        """
+        packet_len = 2  # CAMERA + VICTIM
+        checksum = (packet_len + camera_id + victim_id) & 0xFF
+        
+        packet = struct.pack("BBBBBB", 
+                            0xFF,        # HEADER0
+                            0xAA,        # HEADER1
+                            packet_len,  # Length
+                            camera_id,   # Camera (0=RIGHT, 1=LEFT)
+                            victim_id,   # Victim (1=PHI, 2=PSI, 3=OMEGA)
+                            checksum)    # Checksum
+        
+        bytes_written = self.port.write(packet)
+        self.port.flush()
+        return bytes_written
+    
     def listen_and_respond(self):
         """
         Listen for ESP requests and respond with vision data
         Runs in a loop - processes requests and sends responses
         """
         print("[LISTENER] Waiting for ESP requests...")
+        print("(ESP asks every 5 seconds, you have time to enter data)")
         try:
             while True:
                 # Check for incoming requests
@@ -288,11 +311,20 @@ class Esp32():
                     
                     # Parse request: 0xFF 0xAA 0x01 0x01 [CHECKSUM]
                     if len(data) >= 5 and data[0] == 0xFF and data[1] == 0xAA and data[2] == 0x01 and data[3] == 0x01:
-                        print("[ESP REQUEST] Received data request")
+                        print("\n[ESP REQUEST] Received data request")
                         
-                        # Ask user for camera and victim
-                        print("\nEnter detection:")
+                        # Ask user for camera and victim with timeout
+                        print("Enter detection (5 seconds):")
+                        import sys
+                        import time as time_module
+                        
+                        start_time = time_module.time()
                         cam_input = input("Camera (0=RIGHT, 1=LEFT): ").strip()
+                        
+                        if time_module.time() - start_time > 10:
+                            print("Timeout waiting for input")
+                            continue
+                        
                         victim_input = input("Victim (1=PHI, 2=PSI, 3=OMEGA): ").strip()
                         
                         try:
@@ -311,14 +343,16 @@ class Esp32():
                             print(f"[SENT] Camera={camera_id}, Victim={victim_id}")
                             
                             # Wait for ACK
-                            import time
-                            time.sleep(0.5)
+                            time_module.sleep(0.5)
                             if self.port.in_waiting > 0:
                                 ack_data = self.port.read(self.port.in_waiting)
                                 if len(ack_data) >= 6 and ack_data[0] == 0xFF and ack_data[1] == 0xAA:
                                     print("[ACK RECEIVED] Data delivered successfully!")
                         except ValueError:
                             print("Invalid input")
+                else:
+                    import time as time_module
+                    time_module.sleep(0.1)  # Small sleep to avoid CPU spinning
         except KeyboardInterrupt:
             print("\n[LISTENER] Stopped")
         except Exception as e:
