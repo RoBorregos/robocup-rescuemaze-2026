@@ -575,11 +575,11 @@ void motors::ramp(){
             stop();break;
         }
         float error;
-        vlx[vlxID::rightUp].getDistance();
-        vlx[vlxID::leftUp].getDistance();
-        if((vlx[vlxID::rightUp].distance<vlx[vlxID::rightUp].kDistanceToWall && vlx[vlxID::leftUp].distance<vlx[vlxID::leftUp].kDistanceToWall) &&
-        (vlx[vlxID::rightUp].distance<6 || vlx[vlxID::leftUp].distance<6)){
-            error=rampUpPID.calculate_PID(0,(vlx[vlxID::rightUp].distance-vlx[vlxID::leftUp].distance));
+        vlx[vlxID::right].getDistance();
+        vlx[vlxID::left].getDistance();
+        if((vlx[vlxID::right].distance<vlx[vlxID::right].kDistanceToWall && vlx[vlxID::left].distance<vlx[vlxID::left].kDistanceToWall) &&
+        (vlx[vlxID::right].distance<6 || vlx[vlxID::left].distance<6)){
+            error=rampUpPID.calculate_PID(0,(vlx[vlxID::right].distance-vlx[vlxID::left].distance));
             error=constrain(error,-15,15);
             PID_Wheel(kSpeedRampUp-error,MotorID::kFrontLeft);
             PID_Wheel(kSpeedRampUp-error,MotorID::kBackLeft);
@@ -596,11 +596,11 @@ void motors::ramp(){
         // limitCrash();
         if(limitColition==true) break;
         float error;
-        vlx[vlxID::rightUp].getDistance();
-        vlx[vlxID::leftUp].getDistance();
-        if((vlx[vlxID::rightUp].distance<vlx[vlxID::rightUp].kDistanceToWall && vlx[vlxID::leftUp].distance<vlx[vlxID::leftUp].kDistanceToWall) &&
-        (vlx[vlxID::rightUp].distance<6 || vlx[vlxID::leftUp].distance<6)){
-            error=rampDownPID.calculate_PID(0,(vlx[vlxID::rightUp].distance-vlx[vlxID::leftUp].distance));
+        vlx[vlxID::right].getDistance();
+        vlx[vlxID::left].getDistance();
+        if((vlx[vlxID::right].distance<vlx[vlxID::right].kDistanceToWall && vlx[vlxID::left].distance<vlx[vlxID::left].kDistanceToWall) &&
+        (vlx[vlxID::right].distance<6 || vlx[vlxID::left].distance<6)){
+            error=rampDownPID.calculate_PID(0,(vlx[vlxID::right].distance-vlx[vlxID::left].distance));
             error=constrain(error,-6,6);
             PID_Wheel(kSpeedRampDown-error,MotorID::kFrontLeft);
             PID_Wheel(kSpeedRampDown-error,MotorID::kBackLeft);
