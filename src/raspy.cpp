@@ -3,68 +3,66 @@
 #include <Adafruit_SSD1306.h>
 #include <Wire.h>
 
-namespace raspy {
+static constexpr uint8_t HEADER0 = 0xFF;
+static constexpr uint8_t HEADER1 = 0xAA;
 
-static const uint8_t HEADER0 = 0xFF;
-static const uint8_t HEADER1 = 0xAA;
+static constexpr uint8_t CMD_REQUEST_RIGHT = 0x02;
+static constexpr uint8_t CMD_REQUEST_LEFT = 0x03;
 
-static const uint8_t CMD_REQUEST_RIGHT = 0x02;
-static const uint8_t CMD_REQUEST_LEFT = 0x03;
+static constexpr uint8_t CAM_RIGHT = 0;
+static constexpr uint8_t CAM_LEFT = 1;
 
-static const uint8_t CAM_RIGHT = 0;
-static const uint8_t CAM_LEFT = 1;
+static constexpr uint8_t VICTIM_NONE = 0x00;
+static constexpr uint8_t VICTIM_PHI = 0x01;
+static constexpr uint8_t VICTIM_PSI = 0x02;
+static constexpr uint8_t VICTIM_OMEGA = 0x03;
 
-static const uint8_t VICTIM_NONE = 0x00;
-static const uint8_t VICTIM_PHI = 0x01;
-static const uint8_t VICTIM_PSI = 0x02;
-static const uint8_t VICTIM_OMEGA = 0x03;
+static constexpr uint8_t OLED_SDA_PIN = 21;
+static constexpr uint8_t OLED_SCL_PIN = 22;
+static constexpr uint8_t OLED_ADDR = 0x3C;
+static constexpr uint8_t OLED_WIDTH = 128;
+static constexpr uint8_t OLED_HEIGHT = 64;
 
-static const uint8_t OLED_SDA_PIN = 21;
-static const uint8_t OLED_SCL_PIN = 22;
-static const uint8_t OLED_ADDR = 0x3C;
-static const uint8_t OLED_WIDTH = 128;
-static const uint8_t OLED_HEIGHT = 64;
-
-static const uint32_t POLL_INTERVAL_MS = 250;
-static const uint32_t REQUEST_GAP_MS = 10;
-static const uint8_t SAMPLES_PER_CAMERA = 3;
-static const uint32_t CYCLE_TIMEOUT_MS = 500;
-
-enum RxState : uint8_t {
-  WAIT_FF,
-  WAIT_AA,
-  WAIT_LEN,
-  WAIT_PAYLOAD,
-  WAIT_CHECK
-};
+static constexpr uint32_t POLL_INTERVAL_MS = 250;
+static constexpr uint32_t REQUEST_GAP_MS = 10;
+static constexpr uint8_t SAMPLES_PER_CAMERA = 3;
+static constexpr uint32_t CYCLE_TIMEOUT_MS = 500;
 
 static Adafruit_SSD1306 oled(OLED_WIDTH, OLED_HEIGHT, &Wire, -1);
-static bool oledReady = false;
 
-static uint8_t lastVictimRight = VICTIM_NONE;
-static uint8_t lastVictimLeft = VICTIM_NONE;
+RaspyLink raspyLink;
 
-static uint32_t lastPollMs = 0;
-static uint32_t cycleStartMs = 0;
-static uint32_t lastRequestMs = 0;
+void RaspyLink::setup() {
+  Wire.begin(OLED_SDA_PIN, OLED_SCL_PIN);
+  oledReady_ = oled.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR);
+  if (!oledReady_) {
+    oledReady_ = oled.begin(SSD1306_SWITCHCAPVCC, 0x3D);
+  }
+  lastPollMs_ = millis() - POLL_INTERVAL_MS;
+  renderOled();
+  resetCycle();
+  sendCycleRequests();
+}
 
-static bool cycleActive = false;
-static uint8_t requestStep = 0;
+void RaspyLink::getDetection() {
+  const uint32_t now = millis();
+  if (!cycleActive_ && (now - lastPollMs_ >= POLL_INTERVAL_MS)) {
+    lastPollMs_ = now;
+    resetCycle();
+  }
 
-static uint8_t rightSamples = 0;
-static uint8_t leftSamples = 0;
-static uint8_t rightVotes[4] = {0, 0, 0, 0};
-static uint8_t leftVotes[4] = {0, 0, 0, 0};
+  if (cycleActive_) {
+    sendCycleRequests();
+  }
 
-static RxState rxState = WAIT_FF;
-static uint8_t rxLen = 0;
-static uint8_t rxPayload[16];
-static uint8_t rxIndex = 0;
-static uint8_t rxChecksum = 0;
+  while (Serial.available() > 0) {
+    parseIncomingByte((uint8_t)Serial.read());
+  }
 
-static void renderOled();
+  checkCycleTimeout();
+}
 
-const char* victimLabel(uint8_t victimId) {
+const char* RaspyLink::victimLabel(uint8_t victimId) const {
   switch (victimId) {
     case VICTIM_NONE:
       return "N";
@@ -79,35 +77,36 @@ const char* victimLabel(uint8_t victimId) {
   }
 }
 
-uint8_t rightVictim() {
-  return lastVictimRight;
+uint8_t RaspyLink::rightVictim() const {
+  return lastVictimRight_;
 }
 
-uint8_t leftVictim() {
-  return lastVictimLeft;
+uint8_t RaspyLink::leftVictim() const {
+  return lastVictimLeft_;
 }
 
-static void sendRequest(uint8_t cmd) {
+void RaspyLink::sendRequest(uint8_t cmd) {
   const uint8_t payloadLen = 0x01;
   const uint8_t checksum = (uint8_t)((payloadLen + cmd) & 0xFF);
   const uint8_t packet[5] = {HEADER0, HEADER1, payloadLen, cmd, checksum};
   Serial.write(packet, sizeof(packet));
+  Serial.flush();
 }
 
-static void resetCycle() {
-  rightSamples = 0;
-  leftSamples = 0;
+void RaspyLink::resetCycle() {
+  rightSamples_ = 0;
+  leftSamples_ = 0;
   for (uint8_t i = 0; i < 4; ++i) {
-    rightVotes[i] = 0;
-    leftVotes[i] = 0;
+    rightVotes_[i] = 0;
+    leftVotes_[i] = 0;
   }
-  requestStep = 0;
-  cycleStartMs = millis();
-  lastRequestMs = 0;
-  cycleActive = true;
+  requestStep_ = 0;
+  cycleStartMs_ = millis();
+  lastRequestMs_ = 0;
+  cycleActive_ = true;
 }
 
-static uint8_t chooseMostReliableVictim(const uint8_t* votes, uint8_t fallbackVictim) {
+uint8_t RaspyLink::chooseMostReliableVictim(const uint8_t* votes, uint8_t fallbackVictim) const {
   uint8_t bestVictim = fallbackVictim;
   uint8_t bestCount = 0;
 
@@ -125,20 +124,20 @@ static uint8_t chooseMostReliableVictim(const uint8_t* votes, uint8_t fallbackVi
   return bestVictim;
 }
 
-static void finalizeCycle() {
-  if (rightSamples > 0) {
-    lastVictimRight = chooseMostReliableVictim(rightVotes, lastVictimRight);
+void RaspyLink::finalizeCycle() {
+  if (rightSamples_ > 0) {
+    lastVictimRight_ = chooseMostReliableVictim(rightVotes_, lastVictimRight_);
   }
-  if (leftSamples > 0) {
-    lastVictimLeft = chooseMostReliableVictim(leftVotes, lastVictimLeft);
+  if (leftSamples_ > 0) {
+    lastVictimLeft_ = chooseMostReliableVictim(leftVotes_, lastVictimLeft_);
   }
 
   renderOled();
-  cycleActive = false;
+  cycleActive_ = false;
 }
 
-static void renderOled() {
-  if (!oledReady) {
+void RaspyLink::renderOled() {
+  if (!oledReady_) {
     return;
   }
 
@@ -150,19 +149,19 @@ static void renderOled() {
   oled.println("RIGHT");
   oled.setTextSize(2);
   oled.setCursor(0, 12);
-  oled.println(victimLabel(lastVictimRight));
+  oled.println(victimLabel(lastVictimRight_));
 
   oled.setTextSize(1);
   oled.setCursor(64, 0);
   oled.println("LEFT");
   oled.setTextSize(2);
   oled.setCursor(64, 12);
-  oled.println(victimLabel(lastVictimLeft));
+  oled.println(victimLabel(lastVictimLeft_));
 
   oled.display();
 }
 
-static void onDetectionPacket(uint8_t len, const uint8_t* payload) {
+void RaspyLink::onDetectionPacket(uint8_t len, const uint8_t* payload) {
   if (len != 2) {
     return;
   }
@@ -178,30 +177,30 @@ static void onDetectionPacket(uint8_t len, const uint8_t* payload) {
     return;
   }
 
-  if (!cycleActive) {
+  if (!cycleActive_) {
     if (camId == CAM_RIGHT) {
-      lastVictimRight = victimId;
+      lastVictimRight_ = victimId;
     } else {
-      lastVictimLeft = victimId;
+      lastVictimLeft_ = victimId;
     }
     renderOled();
     return;
   }
 
-  if (camId == CAM_RIGHT && rightSamples < SAMPLES_PER_CAMERA) {
-    rightVotes[victimId]++;
-    rightSamples++;
-  } else if (camId == CAM_LEFT && leftSamples < SAMPLES_PER_CAMERA) {
-    leftVotes[victimId]++;
-    leftSamples++;
+  if (camId == CAM_RIGHT && rightSamples_ < SAMPLES_PER_CAMERA) {
+    rightVotes_[victimId]++;
+    rightSamples_++;
+  } else if (camId == CAM_LEFT && leftSamples_ < SAMPLES_PER_CAMERA) {
+    leftVotes_[victimId]++;
+    leftSamples_++;
   }
 
-  if (rightSamples >= SAMPLES_PER_CAMERA && leftSamples >= SAMPLES_PER_CAMERA) {
+  if (rightSamples_ >= SAMPLES_PER_CAMERA && leftSamples_ >= SAMPLES_PER_CAMERA) {
     finalizeCycle();
   }
 }
 
-static void sendCycleRequests() {
+void RaspyLink::sendCycleRequests() {
   static const uint8_t requestSequence[SAMPLES_PER_CAMERA * 2] = {
       CMD_REQUEST_RIGHT, CMD_REQUEST_LEFT,
       CMD_REQUEST_RIGHT, CMD_REQUEST_LEFT,
@@ -211,93 +210,67 @@ static void sendCycleRequests() {
   const uint8_t totalSteps = sizeof(requestSequence) / sizeof(requestSequence[0]);
   const uint32_t now = millis();
 
-  if (requestStep >= totalSteps) {
+  if (requestStep_ >= totalSteps) {
     return;
   }
 
-  if (lastRequestMs == 0 || (now - lastRequestMs) >= REQUEST_GAP_MS) {
-    sendRequest(requestSequence[requestStep]);
-    lastRequestMs = now;
-    requestStep++;
+  if (lastRequestMs_ == 0 || (now - lastRequestMs_) >= REQUEST_GAP_MS) {
+    sendRequest(requestSequence[requestStep_]);
+    lastRequestMs_ = now;
+    requestStep_++;
   }
 }
 
-static void checkCycleTimeout() {
-  if (!cycleActive) {
+void RaspyLink::checkCycleTimeout() {
+  if (!cycleActive_) {
     return;
   }
 
-  if (millis() - cycleStartMs >= CYCLE_TIMEOUT_MS) {
+  if (millis() - cycleStartMs_ >= CYCLE_TIMEOUT_MS) {
     finalizeCycle();
   }
 }
 
-static void parseIncomingByte(uint8_t byteValue) {
-  switch (rxState) {
+void RaspyLink::parseIncomingByte(uint8_t byteValue) {
+  switch (rxState_) {
     case WAIT_FF:
       if (byteValue == HEADER0) {
-        rxState = WAIT_AA;
+        rxState_ = WAIT_AA;
       }
       break;
 
     case WAIT_AA:
       if (byteValue == HEADER1) {
-        rxState = WAIT_LEN;
+        rxState_ = WAIT_LEN;
       } else {
-        rxState = WAIT_FF;
+        rxState_ = WAIT_FF;
       }
       break;
 
     case WAIT_LEN:
-      rxLen = byteValue;
-      rxIndex = 0;
-      rxChecksum = rxLen;
-      if (rxLen == 0 || rxLen > sizeof(rxPayload)) {
-        rxState = WAIT_FF;
+      rxLen_ = byteValue;
+      rxIndex_ = 0;
+      rxChecksum_ = rxLen_;
+      if (rxLen_ == 0 || rxLen_ > sizeof(rxPayload_)) {
+        rxState_ = WAIT_FF;
       } else {
-        rxState = WAIT_PAYLOAD;
+        rxState_ = WAIT_PAYLOAD;
       }
       break;
 
     case WAIT_PAYLOAD:
-      rxPayload[rxIndex++] = byteValue;
-      rxChecksum = (uint8_t)((rxChecksum + byteValue) & 0xFF);
-      if (rxIndex >= rxLen) {
-        rxState = WAIT_CHECK;
+      rxPayload_[rxIndex_++] = byteValue;
+      rxChecksum_ = (uint8_t)((rxChecksum_ + byteValue) & 0xFF);
+      if (rxIndex_ >= rxLen_) {
+        rxState_ = WAIT_CHECK;
       }
       break;
 
     case WAIT_CHECK:
-      if (byteValue == rxChecksum) {
-        onDetectionPacket(rxLen, rxPayload);
+      if (byteValue == rxChecksum_) {
+        onDetectionPacket(rxLen_, rxPayload_);
       }
-      rxState = WAIT_FF;
+      rxState_ = WAIT_FF;
       break;
   }
 }
-
-void setupRaspy() {
-  Wire.begin(OLED_SDA_PIN, OLED_SCL_PIN);
-  oledReady = oled.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR);
-  renderOled();
-}
-
-void getDetection() {
-  const uint32_t now = millis();
-  if (!cycleActive && (now - lastPollMs >= POLL_INTERVAL_MS)) {
-    lastPollMs = now;
-    resetCycle();
-  }
-
-  if (cycleActive) {
-    sendCycleRequests();
-  }
-
-  while (Serial.available() > 0) {
-    parseIncomingByte((uint8_t)Serial.read());
-  }
-
-  checkCycleTimeout();
-}
-
-}  // namespace raspy
