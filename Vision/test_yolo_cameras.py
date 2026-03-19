@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import os
+import time
 import cv2
 import numpy as np
 
@@ -35,9 +37,14 @@ def infer_and_draw(detector: VisionDetector, frame, label: str):
 
 def run_preview() -> None:
     detector = VisionDetector()
+    has_display = bool(os.environ.get("DISPLAY"))
     try:
         print("Press q to quit preview")
-        print("If windows don't appear, run with desktop (not SSH headless).")
+        if not has_display:
+            print("[HEADLESS] DISPLAY not found; running console mode.")
+            print("[HEADLESS] Press Ctrl+C to stop.")
+        else:
+            print("If windows don't appear, run with desktop (not SSH headless).")
 
         while True:
             ok_r, frame_r = detector.cap_right.read() if detector.cap_right is not None else (False, None)
@@ -45,19 +52,28 @@ def run_preview() -> None:
 
             if ok_r and frame_r is not None:
                 annotated_r = infer_and_draw(detector, frame_r, "RIGHT")
-                cv2.imshow("RIGHT", annotated_r)
+                if has_display:
+                    cv2.imshow("RIGHT", annotated_r)
             else:
                 blank = np.full((480, 640, 3), 255, dtype=np.uint8)
                 cv2.putText(blank, "RIGHT: camera read failed", (20, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
-                cv2.imshow("RIGHT", blank)
+                if has_display:
+                    cv2.imshow("RIGHT", blank)
 
             if ok_l and frame_l is not None:
                 annotated_l = infer_and_draw(detector, frame_l, "LEFT")
-                cv2.imshow("LEFT", annotated_l)
+                if has_display:
+                    cv2.imshow("LEFT", annotated_l)
             else:
                 blank = np.full((480, 640, 3), 255, dtype=np.uint8)
                 cv2.putText(blank, "LEFT: camera read failed", (20, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
-                cv2.imshow("LEFT", blank)
+                if has_display:
+                    cv2.imshow("LEFT", blank)
+
+            if not has_display:
+                print(f"[HEADLESS] RIGHT_OK={ok_r} LEFT_OK={ok_l}")
+                time.sleep(0.4)
+                continue
 
             key = cv2.waitKey(1) & 0xFF
             if key == ord("q"):
