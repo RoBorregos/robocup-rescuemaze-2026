@@ -49,6 +49,11 @@ bool Tile::hasObstacle() const {
 
 void Tile::setBlackTile() {
     this->data_ |= (1 << kBlackTileBit);
+    for(uint8_t i = 0; i < kNumberOfDirections; ++i){
+        if(adjacentTiles_[i] != nullptr){
+            weights_[i] = kBlackTileWeight;
+        }
+    }
 }
 
 bool Tile::hasBlackTile() const {
@@ -68,6 +73,8 @@ void Tile::addAdjacentTile(const TileDirection direction, Tile *tile, const bool
     this->setWall(direction, wall);
     if(wall){
         weights_[static_cast<int>(direction)] = kWallTileWeight;
+    } else if(this->hasBlackTile() || (tile != nullptr && tile->hasBlackTile())){
+        weights_[static_cast<int>(direction)] = kBlackTileWeight;
     } else if(blue){
         weights_[static_cast<int>(direction)] = kBlueTileWeight;
     }else {
