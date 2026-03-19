@@ -214,7 +214,7 @@ void motors::passObstacle(){
         if (sideAngle >= 360) sideAngle -= 360;
         if (sideAngle < 0) sideAngle += 360;
         rotate(sideAngle); //rotate 25 degrees to the left
-        moveDistance(kTileLength/5, true);
+        moveDistance(kTileLength*0.3, true);
     }
 
     else if (leftBlocked && !rightBlocked){
@@ -222,10 +222,9 @@ void motors::passObstacle(){
         if (sideAngle >= 360) sideAngle -= 360;
         if (sideAngle < 0) sideAngle += 360;
         rotate(sideAngle); //rotate 25 degrees to the right
-        moveDistance(kTileLength/5, true);
+        moveDistance(kTileLength*0.3, true);
     }
     rotate(targetAngle_);
-    moveDistance(kTileLength/5, true);
     targetAngle = targetAngle_;
     limitColition = false;
 }
