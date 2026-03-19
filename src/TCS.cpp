@@ -1,73 +1,127 @@
 #include "TCS.h"
 
-TCS::TCS()
-    : tcs_(TCS34725_INTEGRATIONTIME_50MS, TCS34725_GAIN_4X) {
+#define DEBUG_TCS 0
+
+TCS::TCS() {
+    setDefaultValues();
 }
 
-void TCS::setMux(const uint8_t pos) {
-    muxPos_ = pos;
-    mux_.setNewChannel(pos);
+TCS::TCS(const uint8_t posMux) {
+    mux_.setNewChannel(posMux);
+    setDefaultValues();
 }
 
-bool TCS::init() {
-    mux_.selectChannel(muxPos_);
-    initialized_ = tcs_.begin();
-    return initialized_;
+void TCS::init() {
+    mux_.selectChannel();
+    Serial.println("Attempting to initialize TCS...");
+    if (!tcs_.begin()) {
+        Serial.println("ERROR: No TCS34725 found ... check your connections");
+        while (1) {
+#if DEBUG_TCS
+            Serial.println("No TCS34725 found ... check your connections");
+#endif
+        }
+    }
+    Serial.println("TCS initialized correctly.");
+}
+
+void TCS::setDefaultValues() {
+    red_ = 0;
+    green_ = 0;
+    blue_ = 0;
+    clear_ = 0;
+}
+
+void TCS::updateRGB() {
+    mux_.selectChannel();
+    tcs_.setInterrupt(false);
+    delay(millisToWait_);
+    tcs_.getRGB(&red_, &green_, &blue_);
+    tcs_.setInterrupt(true);
 }
 
 void TCS::updateRGBC() {
-    if (!initialized_) {
-        return;
-    }
-
-    mux_.selectChannel(muxPos_);
-    uint16_t r = 0;
-    uint16_t g = 0;
-    uint16_t b = 0;
-    uint16_t c = 0;
-    tcs_.getRawData(&r, &g, &b, &c);
-    red_ = static_cast<float>(r);
-    green_ = static_cast<float>(g);
-    blue_ = static_cast<float>(b);
-    clear_ = static_cast<float>(c);
+    uint16_t redR;
+    uint16_t greenR;
+    uint16_t blueR;
+    uint16_t clearR;
+    mux_.selectChannel();
+    tcs_.setInterrupt(false);
+    delay(millisToWait_);
+    tcs_.getRawData(&redR, &greenR, &blueR, &clearR);
+    red_ = redR;
+    green_ = greenR;
+    blue_ = blueR;
+    clear_ = clearR;
+    tcs_.setInterrupt(true);
 }
 
 void TCS::printRGB() {
-    Serial.print("R:");
-    Serial.print(red_);
-    Serial.print(" G:");
-    Serial.print(green_);
-    Serial.print(" B:");
-    Serial.print(blue_);
-    Serial.print(" C:");
+    updateRGBC();
+    Serial.println(red_);
+    Serial.println(green_);
+    Serial.println(blue_);
+}
+
+void TCS::printRGBC() {
+    const unsigned long t = millis();
+    updateRGBC();
+#if DEBUG_TCS
+    Serial.print("Time:\t");
+    Serial.println(millis() - t);
+    Serial.print("R:\t");
+    Serial.println(red_);
+    Serial.print("G:\t");
+    Serial.println(green_);
+    Serial.print("B:\t");
+    Serial.println(blue_);
+    Serial.print("C:\t");
     Serial.println(clear_);
+#else
+    (void)t;
+#endif
+}
+
+void TCS::setMux(const uint8_t posMux) {
+    mux_.setNewChannel(posMux);
+}
+
+void TCS::printColor() {
+    Serial.println(getColor());
 }
 
 char TCS::getColor() {
-    if (!initialized_) {
-        return 'U';
-    }
-
     updateRGBC();
+    char colorLetter = kUndefinedColor_;
 
-    if (clear_ < 80.0f) {
-        return 'N';
+    if (red_ > kMinRedValueInBlue_ && green_ > kMinGreenValueInBlue_ && blue_ > kMinBlueValueInBlue_ &&
+        red_ < kMaxRedValueInBlue_ && green_ < kMaxGreenValueInBlue_ && blue_ < kMaxBlueValueInBlue_) {
+        colorLetter = kBlueColor_;
+#if DEBUG_TCS
+        Serial.println("blue");
+#endif
+    } else if (red_ > kMinRedValueInBlack_ && green_ > kMinGreenValueInBlack_ && blue_ > kMinBlueValueInBlack_ &&
+               red_ < kMaxRedValueInBlack_ && green_ < kMaxGreenValueInBlack_ && blue_ < kMaxBlueValueInBlack_) {
+        colorLetter = kBlackColor_;
+#if DEBUG_TCS
+        Serial.println("black");
+#endif
+    } else if (red_ > kMinRedValueInCheckpoint_ && green_ > kMinGreenValueInCheckpoint_ && blue_ > kMinBlueValueInCheckpoint_ &&
+               red_ < kMaxRedValueInCheckpoint_ && green_ < kMaxGreenValueInCheckpoint_ && blue_ < kMaxBlueValueInCheckpoint_) {
+        colorLetter = kCheckpointColor_;
+#if DEBUG_TCS
+        Serial.println("checkpoint");
+#endif
+    } else {
+        colorLetter = kUndefinedColor_;
+#if DEBUG_TCS
+        Serial.println("unknown");
+#endif
     }
 
-    const float sum = red_ + green_ + blue_ + 1.0f;
-    const float r = red_ / sum;
-    const float g = green_ / sum;
-    const float b = blue_ / sum;
-
-    if (b > 0.45f) {
-        return 'B';
-    }
-    if (r > 0.45f) {
-        return 'R';
-    }
-    if (clear_ > 800.0f) {
-        return 'C';
-    }
-
-    return 'W';
+#if DEBUG_TCS
+    Serial.print("colorLetter: ");
+    Serial.println(colorLetter);
+#endif
+    return colorLetter;
 }
