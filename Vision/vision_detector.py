@@ -252,8 +252,7 @@ class VisionDetector:
                 pass
 
     def read_frame(self, camera_id: int):
-        if camera_id == CAM_RIGHT:
-            if self.picam_right is not None:
+        if camera_id == CAM_RIGHT and self.picam_right is not None:
                 try:
                     frame = self.picam_right.capture_array()
                     if frame is not None:
