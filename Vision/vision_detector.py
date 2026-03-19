@@ -33,12 +33,18 @@ class VisionDetector:
         self.model = YOLO(str(self.model_path))
         self.conf = getattr(Constants, "vision_conf_threshold", 0.45)
         self.imgsz = getattr(Constants, "vision_imgsz", 640)
+        self.iou = getattr(Constants, "vision_iou_threshold", 0.50)
+        self.device = getattr(Constants, "vision_device", "cpu")
+        self.frame_width = getattr(Constants, "vision_frame_width", 640)
+        self.frame_height = getattr(Constants, "vision_frame_height", 480)
 
         self.cam_right_idx = getattr(Constants, "camera_right_index", 0)
         self.cam_left_idx = getattr(Constants, "camera_left_index", 1)
 
         self.cap_right = cv2.VideoCapture(self.cam_right_idx)
         self.cap_left = cv2.VideoCapture(self.cam_left_idx)
+        self._configure_capture(self.cap_right)
+        self._configure_capture(self.cap_left)
 
         if not self.cap_right.isOpened() or not self.cap_left.isOpened():
             self._autodetect_cameras()
@@ -46,7 +52,10 @@ class VisionDetector:
         if not self.cap_right.isOpened() and not self.cap_left.isOpened():
             raise RuntimeError("Could not open any camera (RIGHT/LEFT)")
 
-        print(f"[VISION] Model={self.model_path.name} conf={self.conf} imgsz={self.imgsz}")
+        print(
+            f"[VISION] Model={self.model_path.name} conf={self.conf} iou={self.iou} "
+            f"imgsz={self.imgsz} device={self.device}"
+        )
         print(
             f"[VISION] RIGHT idx={self.cam_right_idx} open={self.cap_right.isOpened()} | "
             f"LEFT idx={self.cam_left_idx} open={self.cap_left.isOpened()}"
@@ -89,6 +98,7 @@ class VisionDetector:
             self.cap_right.release()
             self.cam_right_idx = available[0]
             self.cap_right = cv2.VideoCapture(self.cam_right_idx)
+            self._configure_capture(self.cap_right)
 
         if not self.cap_left.isOpened():
             self.cap_left.release()
@@ -97,6 +107,13 @@ class VisionDetector:
             else:
                 self.cam_left_idx = available[0]
             self.cap_left = cv2.VideoCapture(self.cam_left_idx)
+            self._configure_capture(self.cap_left)
+
+    def _configure_capture(self, cap: cv2.VideoCapture) -> None:
+        if cap is None:
+            return
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.frame_width)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.frame_height)
 
     def close(self) -> None:
         if self.cap_right is not None:
@@ -133,7 +150,14 @@ class VisionDetector:
             if not ok or frame is None:
                 continue
 
-            results = self.model.predict(frame, conf=self.conf, imgsz=self.imgsz, verbose=False)
+            results = self.model.predict(
+                frame,
+                conf=self.conf,
+                iou=self.iou,
+                imgsz=self.imgsz,
+                device=self.device,
+                verbose=False,
+            )
             if not results:
                 continue
 

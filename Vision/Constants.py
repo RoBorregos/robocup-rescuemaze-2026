@@ -13,5 +13,9 @@ baud_rate = 115200
 timeout = 0.5
 
 # Vision settings
-vision_conf_threshold = 0.45
+vision_conf_threshold = 0.25
 vision_imgsz = 640
+vision_iou_threshold = 0.50
+vision_frame_width = 640
+vision_frame_height = 480
+vision_device = "cpu"
