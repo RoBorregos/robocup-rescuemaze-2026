@@ -51,6 +51,9 @@ class VisionDetector:
             f"[VISION] RIGHT idx={self.cam_right_idx} open={self.cap_right.isOpened()} | "
             f"LEFT idx={self.cam_left_idx} open={self.cap_left.isOpened()}"
         )
+        names = getattr(self.model, "names", None)
+        if isinstance(names, dict):
+            print(f"[VISION] model classes={names}")
 
     def _autodetect_cameras(self) -> None:
         available = []
@@ -93,6 +96,7 @@ class VisionDetector:
             return VICTIM_PSI
         if "omega" in text or text == "u" or "unharm" in text:
             return VICTIM_OMEGA
+        print(f"[VISION] unmapped class='{class_name}' -> NONE")
         return VICTIM_NONE
 
     def detect_victim(self, camera_id: int) -> int:
