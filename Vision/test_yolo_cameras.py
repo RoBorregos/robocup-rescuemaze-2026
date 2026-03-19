@@ -47,8 +47,8 @@ def run_preview() -> None:
             print("If windows don't appear, run with desktop (not SSH headless).")
 
         while True:
-            ok_r, frame_r = detector.cap_right.read() if detector.cap_right is not None else (False, None)
-            ok_l, frame_l = detector.cap_left.read() if detector.cap_left is not None else (False, None)
+            ok_r, frame_r = detector.read_frame(CAM_RIGHT)
+            ok_l, frame_l = detector.read_frame(CAM_LEFT)
 
             if ok_r and frame_r is not None:
                 annotated_r = infer_and_draw(detector, frame_r, "RIGHT")

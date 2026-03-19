@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import os
+import importlib
 from pathlib import Path
+from typing import Optional
 
 # Avoid noisy/buggy obsensor probing on Raspberry Pi OpenCV builds
 os.environ.setdefault("OPENCV_VIDEOIO_PRIORITY_OBSENSOR", "0")
@@ -50,6 +52,9 @@ class VisionDetector:
         self._configure_capture(self.cap_right)
         self._configure_capture(self.cap_left)
 
+        self.picam_right = None
+        self.picam_left = None
+
         if not self.cap_right.isOpened() or not self.cap_left.isOpened():
             self._autodetect_cameras()
 
@@ -69,6 +74,49 @@ class VisionDetector:
             print(f"[VISION] model classes={names}")
 
         self._check_camera_reads()
+        self._activate_picamera2_if_needed()
+        self._check_camera_reads()
+
+    def _init_picamera(self, camera_num: int):
+        try:
+            Picamera2 = importlib.import_module("picamera2").Picamera2
+        except Exception:
+            return None
+        try:
+            picam = Picamera2(camera_num)
+            config = picam.create_preview_configuration(main={"size": (self.frame_width, self.frame_height)})
+            picam.configure(config)
+            picam.start()
+            return picam
+        except Exception as exc:
+            print(f"[VISION] Picamera2 init failed for camera {camera_num}: {exc}")
+            return None
+
+    def _activate_picamera2_if_needed(self) -> None:
+        right_ok = self._can_read_once(self.cap_right)
+        left_ok = self._can_read_once(self.cap_left)
+
+        if right_ok and left_ok:
+            return
+
+        try:
+            importlib.import_module("picamera2")
+        except Exception:
+            print("[VISION] Picamera2 not available. Install with: sudo apt install -y python3-picamera2")
+            return
+
+        print("[VISION] Switching to Picamera2 backend for cameras that fail with OpenCV...")
+
+        if not right_ok:
+            self.picam_right = self._init_picamera(0)
+        if not left_ok:
+            self.picam_left = self._init_picamera(1)
+
+    def _can_read_once(self, cap: Optional[cv2.VideoCapture]) -> bool:
+        if cap is None or not cap.isOpened():
+            return False
+        ok, frame = cap.read()
+        return bool(ok and frame is not None)
 
     def _check_camera_reads(self) -> None:
         def test_cap(cap: cv2.VideoCapture, label: str) -> None:
@@ -83,8 +131,24 @@ class VisionDetector:
                     ok_count += 1
             print(f"[VISION] {label}: warmup_reads_ok={ok_count}/5")
 
+        def test_picam(picam, label: str) -> None:
+            if picam is None:
+                print(f"[VISION] {label}: not opened")
+                return
+            ok_count = 0
+            for _ in range(5):
+                try:
+                    frame = picam.capture_array()
+                    if frame is not None:
+                        ok_count += 1
+                except Exception:
+                    pass
+            print(f"[VISION] {label}: warmup_reads_ok={ok_count}/5")
+
         test_cap(self.cap_right, f"RIGHT(idx={self.cam_right_idx})")
         test_cap(self.cap_left, f"LEFT(idx={self.cam_left_idx})")
+        test_picam(self.picam_right, "RIGHT(picamera2)")
+        test_picam(self.picam_left, "LEFT(picamera2)")
 
     def _autodetect_cameras(self) -> None:
         available = []
@@ -132,6 +196,40 @@ class VisionDetector:
             self.cap_right.release()
         if self.cap_left is not None:
             self.cap_left.release()
+        if self.picam_right is not None:
+            try:
+                self.picam_right.stop()
+            except Exception:
+                pass
+        if self.picam_left is not None:
+            try:
+                self.picam_left.stop()
+            except Exception:
+                pass
+
+    def read_frame(self, camera_id: int):
+        if camera_id == CAM_RIGHT:
+            if self.picam_right is not None:
+                try:
+                    frame = self.picam_right.capture_array()
+                    if frame is not None:
+                        return True, cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                except Exception:
+                    pass
+            if self.cap_right is not None:
+                return self.cap_right.read()
+            return False, None
+
+        if self.picam_left is not None:
+            try:
+                frame = self.picam_left.capture_array()
+                if frame is not None:
+                    return True, cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+            except Exception:
+                pass
+        if self.cap_left is not None:
+            return self.cap_left.read()
+        return False, None
 
     @staticmethod
     def _class_to_victim_id(class_name: str) -> int:
@@ -146,19 +244,11 @@ class VisionDetector:
         return VICTIM_NONE
 
     def detect_victim(self, camera_id: int) -> int:
-        cap = self.cap_right if camera_id == CAM_RIGHT else self.cap_left
-        if cap is None or not cap.isOpened():
-            # Fallback to the other camera if requested one is unavailable
-            fallback = self.cap_left if camera_id == CAM_RIGHT else self.cap_right
-            if fallback is None or not fallback.isOpened():
-                return VICTIM_NONE
-            cap = fallback
-
         best_conf_global = -1.0
         best_class_name = None
 
         for _ in range(3):
-            ok, frame = cap.read()
+            ok, frame = self.read_frame(camera_id)
             if not ok or frame is None:
                 continue
 
