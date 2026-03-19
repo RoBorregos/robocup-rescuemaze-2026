@@ -15,7 +15,15 @@ timeout = 0.5
 # Vision settings
 vision_conf_threshold = 0.25
 vision_imgsz = 640
-vision_iou_threshold = 0.50
+vision_iou_threshold = 0.30
 vision_frame_width = 640
 vision_frame_height = 480
 vision_device = "cpu"
+vision_inference_frames = 1
+vision_inference_timeout_ms = 180
+
+# Autofocus (Raspberry Camera Module 3)
+# Modes: "continuous", "auto", "manual", "off"
+camera_autofocus_mode = "continuous"
+# For manual mode only (typical range ~0.0 to ~10.0 depending on lens)
+camera_lens_position = 1.5

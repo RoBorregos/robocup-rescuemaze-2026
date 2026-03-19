@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import importlib
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -41,6 +42,8 @@ class VisionDetector:
         self.imgsz = getattr(Constants, "vision_imgsz", 640)
         self.iou = getattr(Constants, "vision_iou_threshold", 0.50)
         self.device = getattr(Constants, "vision_device", "cpu")
+        self.inference_frames = max(1, int(getattr(Constants, "vision_inference_frames", 1)))
+        self.inference_timeout_ms = int(getattr(Constants, "vision_inference_timeout_ms", 180))
         self.frame_width = getattr(Constants, "vision_frame_width", 640)
         self.frame_height = getattr(Constants, "vision_frame_height", 480)
 
@@ -63,7 +66,7 @@ class VisionDetector:
 
         print(
             f"[VISION] Model={self.model_path.name} conf={self.conf} iou={self.iou} "
-            f"imgsz={self.imgsz} device={self.device}"
+            f"imgsz={self.imgsz} device={self.device} frames={self.inference_frames}"
         )
         print(
             f"[VISION] RIGHT idx={self.cam_right_idx} open={self.cap_right.isOpened()} | "
@@ -86,11 +89,36 @@ class VisionDetector:
             picam = Picamera2(camera_num)
             config = picam.create_preview_configuration(main={"size": (self.frame_width, self.frame_height)})
             picam.configure(config)
+            self._apply_autofocus_controls(picam)
             picam.start()
             return picam
         except Exception as exc:
             print(f"[VISION] Picamera2 init failed for camera {camera_num}: {exc}")
             return None
+
+    def _apply_autofocus_controls(self, picam) -> None:
+        mode_name = str(getattr(Constants, "camera_autofocus_mode", "continuous")).strip().lower()
+        lens_position = float(getattr(Constants, "camera_lens_position", 1.5))
+
+        try:
+            controls = {}
+            if mode_name == "continuous":
+                controls["AfMode"] = 2  # Continuous autofocus
+            elif mode_name == "auto":
+                controls["AfMode"] = 1  # Single autofocus
+                controls["AfTrigger"] = 0
+            elif mode_name == "manual":
+                controls["AfMode"] = 0  # Manual focus
+                controls["LensPosition"] = lens_position
+            elif mode_name == "off":
+                controls["AfMode"] = 0
+            else:
+                controls["AfMode"] = 2
+
+            picam.set_controls(controls)
+            print(f"[VISION] autofocus mode={mode_name} controls={controls}")
+        except Exception as exc:
+            print(f"[VISION] autofocus config skipped: {exc}")
 
     def _activate_picamera2_if_needed(self) -> None:
         right_ok = self._can_read_once(self.cap_right)
@@ -246,8 +274,13 @@ class VisionDetector:
     def detect_victim(self, camera_id: int) -> int:
         best_conf_global = -1.0
         best_class_name = None
+        started = time.monotonic()
 
-        for _ in range(3):
+        for _ in range(self.inference_frames):
+            elapsed_ms = (time.monotonic() - started) * 1000.0
+            if elapsed_ms > self.inference_timeout_ms:
+                break
+
             ok, frame = self.read_frame(camera_id)
             if not ok or frame is None:
                 continue
@@ -273,6 +306,11 @@ class VisionDetector:
             best_conf = float(boxes.conf[best_idx].item())
             class_id = int(boxes.cls[best_idx].item())
             class_name = names.get(class_id, str(class_id)) if isinstance(names, dict) else str(class_id)
+
+            mapped = self._class_to_victim_id(class_name)
+            if mapped != VICTIM_NONE:
+                print(f"[VISION] top_class={class_name} conf={best_conf:.3f}")
+                return mapped
 
             if best_conf > best_conf_global:
                 best_conf_global = best_conf
