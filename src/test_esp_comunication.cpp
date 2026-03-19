@@ -1,4 +1,4 @@
-#if 1
+#if 0  // DISABLED: Using raspy.h/raspy.cpp instead
 #include <Arduino.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
