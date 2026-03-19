@@ -13,6 +13,25 @@
 #define VICTIM_PSI   0x02
 #define VICTIM_OMEGA 0x03
 
+// UART Protocol constants
+#define UART_SYNC_BYTE1      0xFF
+#define UART_SYNC_BYTE2      0xAA
+#define UART_PACKET_LEN      0x02
+#define UART_REQUEST_CMD     0x01
+#define UART_BASE_CHECKSUM   0x03
+#define UART_CHECKSUM_MASK   0xFF
+
+// Detection constants
+#define DETECTION_ATTEMPTS   3
+#define DETECTION_MIN_CONSENSUS 2
+#define DETECTION_ATTEMPT_DELAY_MS 50
+
+// Display constants
+#define DISPLAY_LINE_SIZE    20
+#define DISPLAY_FORMAT_LEFT  "L:%s"
+#define DISPLAY_FORMAT_RIGHT "R:%s"
+#define DISPLAY_SEPARATOR    "\n"
+
 class Raspy {
 public:
   Raspy();
@@ -37,6 +56,8 @@ public:
   // Data storage
   uint8_t camera;
   uint8_t victim;
+  uint8_t left_victim;
+  uint8_t right_victim;
   uint32_t waitingTime = 5000;  // 5 seconds waiting for response
 
 private:
@@ -61,6 +82,8 @@ private:
   void parseIncomingByte(uint8_t b);
   void handlePacket(uint8_t len, const uint8_t* payload);
   void sendRequest(uint8_t camera_id);
+  const char* victimIdToName(uint8_t victim_id);
+  void updateDisplaySplitScreen();
 };
 
 extern Raspy raspy;

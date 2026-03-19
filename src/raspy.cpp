@@ -6,6 +6,8 @@ Raspy raspy;
 Raspy::Raspy() {
   camera = CAM_RIGHT;
   victim = VICTIM_NONE;
+  left_victim = VICTIM_NONE;
+  right_victim = VICTIM_NONE;
   rx_state = WAIT_FF;
   rx_index = 0;
   rx_len = 0;
@@ -15,22 +17,22 @@ Raspy::Raspy() {
 
 void Raspy::sendRequest(uint8_t camera_id) {
   // Send request: 0xFF 0xAA 0x02 0x01 [CAMERA] [CHECKSUM]
-  Serial.write(0xFF);
-  Serial.write(0xAA);
-  Serial.write(0x02);      // Length (command + camera)
-  Serial.write(0x01);      // Request command
-  Serial.write(camera_id); // Camera: 0=RIGHT, 1=LEFT
-  Serial.write((uint8_t)(0x03 + camera_id)); // checksum = len + cmd + camera
+  Serial.write(UART_SYNC_BYTE1);
+  Serial.write(UART_SYNC_BYTE2);
+  Serial.write(UART_PACKET_LEN);
+  Serial.write(UART_REQUEST_CMD);
+  Serial.write(camera_id);
+  Serial.write((uint8_t)(UART_BASE_CHECKSUM + camera_id));
   Serial.flush();
 }
 
 void Raspy::writeSerial(uint8_t camera_id, uint8_t victim_id) {
   // Send vision packet: 0xFF 0xAA [LEN] [CAMERA] [VICTIM] [CHECKSUM]
-  uint8_t packet_len = 2;
-  uint8_t checksum = (packet_len + camera_id + victim_id) & 0xFF;
+  uint8_t packet_len = UART_PACKET_LEN;
+  uint8_t checksum = (packet_len + camera_id + victim_id) & UART_CHECKSUM_MASK;
   
-  Serial.write(0xFF);
-  Serial.write(0xAA);
+  Serial.write(UART_SYNC_BYTE1);
+  Serial.write(UART_SYNC_BYTE2);
   Serial.write(packet_len);
   Serial.write(camera_id);
   Serial.write(victim_id);
@@ -55,17 +57,73 @@ bool Raspy::getDetectionFromCamera(uint8_t camera_id) {
 uint8_t Raspy::getDetection() {
   Serial.flush();
   victim = VICTIM_NONE;
+  left_victim = VICTIM_NONE;
+  right_victim = VICTIM_NONE;
 
-  // Ask RIGHT first
-  if (getDetectionFromCamera(CAM_RIGHT) && victim != VICTIM_NONE) {
-    return victim;
+  // Make DETECTION_ATTEMPTS attempts for RIGHT camera
+  uint8_t right_results[DETECTION_ATTEMPTS] = {VICTIM_NONE, VICTIM_NONE, VICTIM_NONE};
+  for (int i = 0; i < DETECTION_ATTEMPTS; i++) {
+    if (getDetectionFromCamera(CAM_RIGHT)) {
+      right_results[i] = victim;
+    }
+    delay(DETECTION_ATTEMPT_DELAY_MS);
   }
 
-  // Then ask LEFT
-  if (getDetectionFromCamera(CAM_LEFT) && victim != VICTIM_NONE) {
-    return victim;
+  // Make DETECTION_ATTEMPTS attempts for LEFT camera
+  uint8_t left_results[DETECTION_ATTEMPTS] = {VICTIM_NONE, VICTIM_NONE, VICTIM_NONE};
+  for (int i = 0; i < DETECTION_ATTEMPTS; i++) {
+    if (getDetectionFromCamera(CAM_LEFT)) {
+      left_results[i] = victim;
+    }
+    delay(DETECTION_ATTEMPT_DELAY_MS);
   }
 
+  // Find consensus for RIGHT: most common result (need at least DETECTION_MIN_CONSENSUS)
+  uint8_t right_consensus = VICTIM_NONE;
+  int max_count = 0;
+  for (uint8_t val = VICTIM_NONE; val <= VICTIM_OMEGA; val++) {
+    int count = 0;
+    for (int i = 0; i < DETECTION_ATTEMPTS; i++) {
+      if (right_results[i] == val) count++;
+    }
+    if (count > max_count) {
+      max_count = count;
+      right_consensus = val;
+    }
+  }
+  right_victim = (max_count >= DETECTION_MIN_CONSENSUS) ? right_consensus : VICTIM_NONE;
+
+  // Find consensus for LEFT: most common result (need at least DETECTION_MIN_CONSENSUS)
+  uint8_t left_consensus = VICTIM_NONE;
+  max_count = 0;
+  for (uint8_t val = VICTIM_NONE; val <= VICTIM_OMEGA; val++) {
+    int count = 0;
+    for (int i = 0; i < DETECTION_ATTEMPTS; i++) {
+      if (left_results[i] == val) count++;
+    }
+    if (count > max_count) {
+      max_count = count;
+      left_consensus = val;
+    }
+  }
+  left_victim = (max_count >= DETECTION_MIN_CONSENSUS) ? left_consensus : VICTIM_NONE;
+
+  // Update display with split screen: LEFT on top, RIGHT on bottom
+  updateDisplaySplitScreen();
+
+  // Return first valid victim (LEFT priority, then RIGHT)
+  if (left_victim != VICTIM_NONE) {
+    victim = left_victim;
+    camera = CAM_LEFT;
+    return left_victim;
+  }
+  if (right_victim != VICTIM_NONE) {
+    victim = right_victim;
+    camera = CAM_RIGHT;
+    return right_victim;
+  }
+
+  victim = VICTIM_NONE;
   return VICTIM_NONE;
 }
 
@@ -74,7 +132,7 @@ uint8_t Raspy::getVictim() const {
 }
 
 void Raspy::handlePacket(uint8_t len, const uint8_t* payload) {
-  if (len != 2) {
+  if (len != UART_PACKET_LEN) {
     return;  // Invalid packet size
   }
   
@@ -95,30 +153,47 @@ void Raspy::handlePacket(uint8_t len, const uint8_t* payload) {
   camera = cam_id;
   victim = victim_id;
   packet_received = true;
-  
-  if (victim != VICTIM_NONE) {
-    char display[20];
-    const char* cam_name = (cam_id == CAM_RIGHT) ? "RIGHT" : "LEFT";
-    const char* victim_name = "NONE";
-    if (victim_id == VICTIM_PHI) victim_name = "PHI";
-    else if (victim_id == VICTIM_PSI) victim_name = "PSI";
-    else if (victim_id == VICTIM_OMEGA) victim_name = "OMEGA";
-    
-    snprintf(display, sizeof(display), "%s:%s", cam_name, victim_name);
-    robot.screenPrint(String(display));
+}
+
+const char* Raspy::victimIdToName(uint8_t victim_id) {
+  switch (victim_id) {
+    case VICTIM_PHI:
+      return "PHI";
+    case VICTIM_PSI:
+      return "PSI";
+    case VICTIM_OMEGA:
+      return "OMEGA";
+    default:
+      return "NONE";
   }
+}
+
+void Raspy::updateDisplaySplitScreen() {
+  // Split screen: LEFT on top (line 1), RIGHT on bottom (line 2)
+  char line1[DISPLAY_LINE_SIZE];
+  char line2[DISPLAY_LINE_SIZE];
+  
+  const char* left_name = victimIdToName(left_victim);
+  const char* right_name = victimIdToName(right_victim);
+  
+  snprintf(line1, sizeof(line1), DISPLAY_FORMAT_LEFT, left_name);
+  snprintf(line2, sizeof(line2), DISPLAY_FORMAT_RIGHT, right_name);
+  
+  // Combine both lines with newline character
+  String display = String(line1) + String(DISPLAY_SEPARATOR) + String(line2);
+  robot.screenPrint(display);
 }
 
 void Raspy::parseIncomingByte(uint8_t b) {
   switch (rx_state) {
     case WAIT_FF:
-      if (b == 0xFF) {
+      if (b == UART_SYNC_BYTE1) {
         rx_state = WAIT_AA;
       }
       break;
     
     case WAIT_AA:
-      if (b == 0xAA) {
+      if (b == UART_SYNC_BYTE2) {
         rx_state = WAIT_LEN;
       } else {
         rx_state = WAIT_FF;
@@ -138,7 +213,7 @@ void Raspy::parseIncomingByte(uint8_t b) {
     
     case WAIT_PAYLOAD:
       rx_payload[rx_index++] = b;
-      rx_checksum = (uint8_t)((rx_checksum + b) & 0xFF);
+      rx_checksum = (uint8_t)((rx_checksum + b) & UART_CHECKSUM_MASK);
       if (rx_index >= rx_len) {
         rx_state = WAIT_CHECK;
       }
