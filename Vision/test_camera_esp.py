@@ -9,7 +9,7 @@ from serial.serialutil import SerialException
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 BAUDRATE = 115200
-TIMEOUT  = 1.0
+TIMEOUT = 1.0
 
 
 def resolve_port() -> str:
@@ -35,26 +35,27 @@ def resolve_port() -> str:
         "Pass one manually, e.g. python Detection/test_camera_esp.py /dev/cu.usbserial-1140"
     )
 
+
 # ── Protocol ──────────────────────────────────────────────────────────────────
 HEADER0 = 0xFF
 HEADER1 = 0xAA
 
 # Commands sent by the ESP to request detection
 CMD_REQUEST_RIGHT = 0x02
-CMD_REQUEST_LEFT  = 0x03
+CMD_REQUEST_LEFT = 0x03
 
 # Victim IDs
 VICTIM_MAP = {
-    "PHI":   0x01,   # Heated   Φ
-    "PSI":   0x02,   # Stable   Ψ
-    "OMEGA": 0x03,   # Unheated Ω
-    "N":     0x00,   # None
+    "PHI": 0x01,  # Heated   Φ
+    "PSI": 0x02,  # Stable   Ψ
+    "OMEGA": 0x03,  # Unheated Ω
+    "N": 0x00,  # None
 }
 
 # Camera IDs
 CAM_MAP = {
-    "0": 0,   # right 
-    "1": 1,   # left 
+    "0": 0,  # right
+    "1": 1,  # left
 }
 
 CAM_LABEL = {0: "RIGHT", 1: "LEFT"}
@@ -65,7 +66,7 @@ def build_packet(cam_id: int, victim_id: int) -> bytes:
     [0xFF][0xAA][len=0x02][cam_id][victim_id][checksum]
     """
     payload_len = 0x02
-    checksum    = (payload_len + cam_id + victim_id) & 0xFF
+    checksum = (payload_len + cam_id + victim_id) & 0xFF
     return struct.pack("6B", HEADER0, HEADER1, payload_len, cam_id, victim_id, checksum)
 
 
@@ -77,40 +78,40 @@ class EspTester:
         print("Connected!\n")
 
         # FSM to receive packets from ESP
-        self.WAITING_FF    = 0
-        self.WAITING_AA    = 1
-        self.RECEIVE_LEN   = 2
-        self.RECEIVE_PKT   = 3
+        self.WAITING_FF = 0
+        self.WAITING_AA = 1
+        self.RECEIVE_LEN = 2
+        self.RECEIVE_PKT = 3
         self.RECEIVE_CHECK = 4
-        self.state_    = self.WAITING_FF
-        self.msg_len_  = 0
+        self.state_ = self.WAITING_FF
+        self.msg_len_ = 0
         self.byte_cnt_ = 0
-        self.cmd_byte_ = b''
-        self.args_     = b''
+        self.cmd_byte_ = b""
+        self.args_ = b""
 
         self.mutex = _thread.allocate_lock()
 
         # Pending values set from keyboard input
-        self.pending_cam_id    = None
+        self.pending_cam_id = None
         self.pending_victim_id = None
         self.last_waiting_notice = 0.0
 
-    #  Reception FSM  
+    #  Reception FSM
     def _fsm(self, byte: bytes) -> bool:
         if self.state_ == self.WAITING_FF:
-            if byte == b'\xff':
-                self.state_    = self.WAITING_AA
-                self.msg_len_  = 0
+            if byte == b"\xff":
+                self.state_ = self.WAITING_AA
+                self.msg_len_ = 0
                 self.byte_cnt_ = 0
-                self.cmd_byte_ = b''
-                self.args_     = b''
+                self.cmd_byte_ = b""
+                self.args_ = b""
 
         elif self.state_ == self.WAITING_AA:
-            self.state_ = self.RECEIVE_LEN if byte == b'\xaa' else self.WAITING_FF
+            self.state_ = self.RECEIVE_LEN if byte == b"\xaa" else self.WAITING_FF
 
         elif self.state_ == self.RECEIVE_LEN:
-            self.msg_len_, = struct.unpack("B", byte)
-            self.state_    = self.RECEIVE_PKT
+            (self.msg_len_,) = struct.unpack("B", byte)
+            self.state_ = self.RECEIVE_PKT
 
         elif self.state_ == self.RECEIVE_PKT:
             if self.byte_cnt_ == 0:
@@ -143,7 +144,9 @@ class EspTester:
             self.ser.write(pkt)
         victim_label = next((k for k, v in VICTIM_MAP.items() if v == victim_id), "?")
         print(f"  [Pi->ESP] packet: {pkt.hex(' ').upper()}")
-        print(f"            camera={cam_id} ({CAM_LABEL[cam_id]}) | victim={victim_id} ({victim_label})\n")
+        print(
+            f"            camera={cam_id} ({CAM_LABEL[cam_id]}) | victim={victim_id} ({victim_label})\n"
+        )
 
     # ── Keyboard thread ───────────────────────────────────────────────────────
     def _keyboard_thread(self):
@@ -171,15 +174,19 @@ class EspTester:
                 continue
 
             if victim_str not in VICTIM_MAP:
-                print(f"  [!] Invalid victim '{victim_str}'. Options: {list(VICTIM_MAP.keys())}\n")
+                print(
+                    f"  [!] Invalid victim '{victim_str}'. Options: {list(VICTIM_MAP.keys())}\n"
+                )
                 continue
 
-            cam_id    = CAM_MAP[cam_str]
+            cam_id = CAM_MAP[cam_str]
             victim_id = VICTIM_MAP[victim_str]
 
-            print(f"  [OK] Queued -> camera={cam_id} ({CAM_LABEL[cam_id]}) | victim={victim_str} (0x{victim_id:02X})")
+            print(
+                f"  [OK] Queued -> camera={cam_id} ({CAM_LABEL[cam_id]}) | victim={victim_str} (0x{victim_id:02X})"
+            )
             print("       It will be sent when the ESP requests that camera.")
-            self.pending_cam_id    = cam_id
+            self.pending_cam_id = cam_id
             self.pending_victim_id = victim_id
 
     # ── Main loop

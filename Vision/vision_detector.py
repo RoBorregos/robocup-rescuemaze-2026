@@ -31,7 +31,9 @@ def resolve_model_path() -> Path:
         return pt_path
     if onnx_path.exists():
         return onnx_path
-    raise FileNotFoundError("No model found in Vision/weights (expected best.onnx or best.pt)")
+    raise FileNotFoundError(
+        "No model found in Vision/weights (expected best.onnx or best.pt)"
+    )
 
 
 class VisionDetector:
@@ -42,8 +44,12 @@ class VisionDetector:
         self.imgsz = getattr(Constants, "vision_imgsz", 640)
         self.iou = getattr(Constants, "vision_iou_threshold", 0.50)
         self.device = getattr(Constants, "vision_device", "cpu")
-        self.inference_frames = max(1, int(getattr(Constants, "vision_inference_frames", 1)))
-        self.inference_timeout_ms = int(getattr(Constants, "vision_inference_timeout_ms", 180))
+        self.inference_frames = max(
+            1, int(getattr(Constants, "vision_inference_frames", 1))
+        )
+        self.inference_timeout_ms = int(
+            getattr(Constants, "vision_inference_timeout_ms", 180)
+        )
         self.frame_width = getattr(Constants, "vision_frame_width", 640)
         self.frame_height = getattr(Constants, "vision_frame_height", 480)
 
@@ -87,7 +93,9 @@ class VisionDetector:
             return None
         try:
             picam = Picamera2(camera_num)
-            config = picam.create_preview_configuration(main={"size": (self.frame_width, self.frame_height)})
+            config = picam.create_preview_configuration(
+                main={"size": (self.frame_width, self.frame_height)}
+            )
             picam.configure(config)
             self._apply_autofocus_controls(picam)
             picam.start()
@@ -97,7 +105,11 @@ class VisionDetector:
             return None
 
     def _apply_autofocus_controls(self, picam) -> None:
-        mode_name = str(getattr(Constants, "camera_autofocus_mode", "continuous")).strip().lower()
+        mode_name = (
+            str(getattr(Constants, "camera_autofocus_mode", "continuous"))
+            .strip()
+            .lower()
+        )
         lens_position = float(getattr(Constants, "camera_lens_position", 1.5))
 
         try:
@@ -130,10 +142,14 @@ class VisionDetector:
         try:
             importlib.import_module("picamera2")
         except Exception:
-            print("[VISION] Picamera2 not available. Install with: sudo apt install -y python3-picamera2")
+            print(
+                "[VISION] Picamera2 not available. Install with: sudo apt install -y python3-picamera2"
+            )
             return
 
-        print("[VISION] Switching to Picamera2 backend for cameras that fail with OpenCV...")
+        print(
+            "[VISION] Switching to Picamera2 backend for cameras that fail with OpenCV..."
+        )
 
         if not right_ok:
             self.picam_right = self._init_picamera(0)
@@ -305,7 +321,11 @@ class VisionDetector:
             best_idx = int(boxes.conf.argmax().item())
             best_conf = float(boxes.conf[best_idx].item())
             class_id = int(boxes.cls[best_idx].item())
-            class_name = names.get(class_id, str(class_id)) if isinstance(names, dict) else str(class_id)
+            class_name = (
+                names.get(class_id, str(class_id))
+                if isinstance(names, dict)
+                else str(class_id)
+            )
 
             mapped = self._class_to_victim_id(class_name)
             if mapped != VICTIM_NONE:
@@ -317,7 +337,9 @@ class VisionDetector:
                 best_class_name = class_name
 
         if best_class_name is None:
-            print(f"[VISION] no detections cam={'RIGHT' if camera_id == CAM_RIGHT else 'LEFT'}")
+            print(
+                f"[VISION] no detections cam={'RIGHT' if camera_id == CAM_RIGHT else 'LEFT'}"
+            )
             return VICTIM_NONE
 
         print(f"[VISION] top_class={best_class_name} conf={best_conf_global:.3f}")

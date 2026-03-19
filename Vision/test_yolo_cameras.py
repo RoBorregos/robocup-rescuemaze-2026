@@ -22,7 +22,15 @@ def infer_and_draw(detector: VisionDetector, frame, label: str):
 
     if not results:
         overlay = frame.copy()
-        cv2.putText(overlay, f"{label}: no result", (20, 35), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 2)
+        cv2.putText(
+            overlay,
+            f"{label}: no result",
+            (20, 35),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            1.0,
+            (0, 0, 255),
+            2,
+        )
         return overlay
 
     result = results[0]
@@ -31,7 +39,9 @@ def infer_and_draw(detector: VisionDetector, frame, label: str):
     count = int(len(boxes)) if boxes is not None else 0
 
     status = f"{label}: detections={count}"
-    cv2.putText(annotated, status, (20, 35), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
+    cv2.putText(
+        annotated, status, (20, 35), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2
+    )
     return annotated
 
 
@@ -56,7 +66,15 @@ def run_preview() -> None:
                     cv2.imshow("RIGHT", annotated_r)
             else:
                 blank = np.full((480, 640, 3), 255, dtype=np.uint8)
-                cv2.putText(blank, "RIGHT: camera read failed", (20, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+                cv2.putText(
+                    blank,
+                    "RIGHT: camera read failed",
+                    (20, 35),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.8,
+                    (0, 0, 255),
+                    2,
+                )
                 if has_display:
                     cv2.imshow("RIGHT", blank)
 
@@ -66,7 +84,15 @@ def run_preview() -> None:
                     cv2.imshow("LEFT", annotated_l)
             else:
                 blank = np.full((480, 640, 3), 255, dtype=np.uint8)
-                cv2.putText(blank, "LEFT: camera read failed", (20, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+                cv2.putText(
+                    blank,
+                    "LEFT: camera read failed",
+                    (20, 35),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.8,
+                    (0, 0, 255),
+                    2,
+                )
                 if has_display:
                     cv2.imshow("LEFT", blank)
 

@@ -18,7 +18,12 @@ from vision_protocol import (
 
 
 class Esp32Service:
-    def __init__(self, port=Constants.serial_port, baudrate=Constants.baud_rate, timeout=Constants.timeout):
+    def __init__(
+        self,
+        port=Constants.serial_port,
+        baudrate=Constants.baud_rate,
+        timeout=Constants.timeout,
+    ):
         self.port_name = port
         self.baudrate = baudrate
         self.timeout = timeout
@@ -30,7 +35,12 @@ class Esp32Service:
         while True:
             try:
                 print(f"Connecting to Microcontroller on port {self.port_name} ...")
-                self.port = Serial(port=self.port_name, baudrate=self.baudrate, timeout=self.timeout, writeTimeout=self.timeout)
+                self.port = Serial(
+                    port=self.port_name,
+                    baudrate=self.baudrate,
+                    timeout=self.timeout,
+                    writeTimeout=self.timeout,
+                )
                 time.sleep(1)
                 print("conectado")
                 return
@@ -57,7 +67,9 @@ class Esp32Service:
 
         print("\n=== Vision System - YOLO Listener Mode ===")
         print(f"Model: {self.detector.model_path.name}")
-        print(f"Cameras: RIGHT={self.detector.cam_right_idx}, LEFT={self.detector.cam_left_idx}")
+        print(
+            f"Cameras: RIGHT={self.detector.cam_right_idx}, LEFT={self.detector.cam_left_idx}"
+        )
         print("Waiting for ESP detection requests... (Ctrl+C to exit)\n")
 
         try:
@@ -70,7 +82,9 @@ class Esp32Service:
                 if packet is None:
                     continue
 
-                print(f"[REQ] len={packet.payload_len} payload={[int(b) for b in packet.payload]}")
+                print(
+                    f"[REQ] len={packet.payload_len} payload={[int(b) for b in packet.payload]}"
+                )
 
                 is_request, camera_id = parse_detection_request(packet)
                 if not is_request:
@@ -79,6 +93,8 @@ class Esp32Service:
 
                 victim_id = self.detector.detect_victim(camera_id)
                 self.send_vision_packet(camera_id, victim_id)
-                print(f"[SENT] CAM={camera_name(camera_id)} VICTIM={victim_name(victim_id)}")
+                print(
+                    f"[SENT] CAM={camera_name(camera_id)} VICTIM={victim_name(victim_id)}"
+                )
         except KeyboardInterrupt:
             print("\n[LISTENER] Stopped")

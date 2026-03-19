@@ -91,12 +91,18 @@ def camera_name(camera_id: int) -> str:
 def build_vision_packet(camera_id: int, victim_id: int) -> bytes:
     payload_len = 2
     checksum = (payload_len + camera_id + victim_id) & 0xFF
-    return struct.pack("BBBBBB", HEADER0, HEADER1, payload_len, camera_id, victim_id, checksum)
+    return struct.pack(
+        "BBBBBB", HEADER0, HEADER1, payload_len, camera_id, victim_id, checksum
+    )
 
 
 def parse_detection_request(packet: Packet) -> Tuple[bool, int]:
     if packet.payload_len == 1 and packet.payload[0] == 0x01:
         return True, CAM_RIGHT
-    if packet.payload_len == 2 and packet.payload[0] == 0x01 and packet.payload[1] in (CAM_RIGHT, CAM_LEFT):
+    if (
+        packet.payload_len == 2
+        and packet.payload[0] == 0x01
+        and packet.payload[1] in (CAM_RIGHT, CAM_LEFT)
+    ):
         return True, int(packet.payload[1])
     return False, CAM_RIGHT
