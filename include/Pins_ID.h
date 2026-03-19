@@ -3,10 +3,10 @@
 #include <Arduino.h>
 
 namespace MotorID{
-    constexpr uint8_t kBackRight=3;
-    constexpr uint8_t kBackLeft=2;   //front left
-    constexpr uint8_t kFrontRight=0; //back left
-    constexpr uint8_t kFrontLeft=1;  //front right
+    constexpr uint8_t kBackRight=0;
+    constexpr uint8_t kBackLeft=1;   //front left
+    constexpr uint8_t kFrontRight=2; //back left
+    constexpr uint8_t kFrontLeft=3;  //front right
 }
 
 namespace Pins{
@@ -24,16 +24,16 @@ namespace Pins{
     };
 
     constexpr uint8_t digitalOne[4] = {
-        4,
-        17, 
-        27, 
-        25  
+        15,
+        16,  
+        14,
+        33   
     };  
     constexpr uint8_t digitalTwo[4] = {
-        15, 
-        16, 
-        14,
-        33
+        4, 
+        17, 
+        27,
+        25
     };
     constexpr uint8_t vlxPins[7] = {//MUX
         3,  

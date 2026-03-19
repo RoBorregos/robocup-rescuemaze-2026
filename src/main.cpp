@@ -15,8 +15,11 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(Pins::encoder[MotorID::kBackRight]), Interrups::backRightEncoder, RISING);
   //attachInterrupt(digitalPinToInterrupt(Pins::checkpointPin),Interrups::lackOfProgress, RISING);
   // robot.reloadKits();
-}
+} 
 
 void loop() {
   m.run_algs();
+  //robot.ahead();}
+  //robot.left();
+  //testMotors();
 }
