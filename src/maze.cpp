@@ -8,6 +8,32 @@ coord checkpointCoord = {kBaseCoord, kBaseCoord, kBaseCoord};
 int robotOrientation = 0;
 uint8_t level = kBaseCoord;
 coord past;
+
+namespace {
+constexpr bool kMazeDebugEnabled = false;
+
+void MazeDebug(const char* message) {
+    if (kMazeDebugEnabled) {
+        Serial.println(message);
+    }
+}
+
+void MazeDebugCoord(const char* label, const coord& value) {
+    if (!kMazeDebugEnabled) {
+        return;
+    }
+
+    Serial.print(label);
+    Serial.print(" (");
+    Serial.print(static_cast<int>(value.x));
+    Serial.print(", ");
+    Serial.print(static_cast<int>(value.y));
+    Serial.print(", ");
+    Serial.print(static_cast<int>(value.z));
+    Serial.println(")");
+}
+}
+
 maze::maze(){}
 // logic
 /*
@@ -30,9 +56,7 @@ void maze::followPath(Stack& path, arrCustom<Tile>& tiles, arrCustom<coord>& til
     path.pop();
     while(!path.empty()){
         const coord& next = path.top();
-        // curr = &tiles.getValue(tilesMap.getIndex(next));
-        Serial.println(next.x);
-        Serial.println(next.y);
+        MazeDebugCoord("followPath next", next);
         path.pop(); 
         if (next.x > robotCoord.x) {
             // if(robotOrientation != 90) detection(curr);
@@ -74,7 +98,7 @@ void maze::dijkstra(coord& start, coord& end, arrCustom<coord>& tilesMap, arrCus
     explored.set(tilesMap.getIndex(start), true);
     uint8_t minDist;
     coord current = start;
-    // robot.screenPrint("Dijkstra");
+    MazeDebug("Dijkstra started");
     while(!explored.getValue(tilesMap.getIndex(end))){ 
         for(const TileDirection& direction : directions){
             const Tile& currentTile = tiles.getValue(tilesMap.getIndex(current));
@@ -110,7 +134,7 @@ void maze::dijkstra(coord& start, coord& end, arrCustom<coord>& tilesMap, arrCus
         current = previousPositions.getValue(tilesMap.getIndex(current));
     }
     path.push(start); // to acces the start position in the followPath function
-    // robot.screenPrint("Path found");
+    MazeDebug("Dijkstra path found");
     followPath(path, tiles, tilesMap);
 }
 
@@ -154,25 +178,20 @@ void maze::dfs(arrCustom<coord>& visitedMap, arrCustom<Tile>& tiles, arrCustom<c
         if(robot.buttonPressed){
             delay(50);
             if(digitalRead(Pins::checkpointPin)==1){
-
-
-            // robot.screenPrint("LoP");      
+            MazeDebug("checkpoint pressed");
             robotCoord = inicio;
             robotOrientation = 0;
-            // robot.screenPrint("START");
+            MazeDebug("returning to start");
             bool braker=false;
             while(true){
-                Serial.println("wat");
-                // robot.screenPrint("waiting");
+                MazeDebug("waiting checkpoint release");
                 if(!robot.buttonPressed){
                     unsigned long time=millis();
                     while(digitalRead(Pins::checkpointPin)==1){
                         if((millis()-time)>500){
                             ESP.restart();  
-                            // robot.screenPrint("r");
+                            MazeDebug("checkpoint restart triggered");
                             delay(500);
-                            // delay(2000);                     
-                            // robot.resetOrientation();
                             robot.resetVlx();
                             robot.bno.setupBNO();
                             braker=true;
@@ -181,18 +200,18 @@ void maze::dfs(arrCustom<coord>& visitedMap, arrCustom<Tile>& tiles, arrCustom<c
                     }break;
                 }
             }
-            Serial.println("resetting visitedMap");
+            MazeDebug("resetting visitedMap");
             visitedMap.reset();
-            Serial.println("resetting tilesMap");
+            MazeDebug("resetting tilesMap");
             tilesMap.reset();
-            Serial.println("resetting tiles");
+            MazeDebug("resetting tiles");
             tiles.reset();
             current = robotCoord;
             unvisited.~Stack();
             unvisited.push(robotCoord);
             tilesMap.push_back(robotCoord);
             tiles.push_back(Tile(robotCoord));
-            Serial.println("good");
+            MazeDebug("checkpoint reset done");
             if(!braker) robot.checkpointElection();
             robot.resetOrientation();
             robot.buttonPressed=false;
@@ -287,7 +306,7 @@ void maze::dfs(arrCustom<coord>& visitedMap, arrCustom<Tile>& tiles, arrCustom<c
                         }
                         if(!visitedFlag){ 
                             unvisited.push(next);
-                            // robot.screenPrint("visited: ");
+                            MazeDebugCoord("queued tile", next);
                         }
                     }
                     
@@ -355,13 +374,14 @@ void maze::dfs(arrCustom<coord>& visitedMap, arrCustom<Tile>& tiles, arrCustom<c
         }
     }
 
-    if(unvisited.empty()){ /* robot.screenPrint("Unvisited empty"); */ delay(5000);}
+    if(unvisited.empty()){
+        MazeDebug("Unvisited empty");
+        delay(5000);
+    }
     if(robot.buttonPressed==false) dijkstra(robotCoord, inicio, tilesMap, tiles); 
 }
 void maze::run_algs(){
-    // while(!robot.buttonPressed) /* robot.screenPrint("START"); */ 
-    // robot.buttonPressed = !robot.buttonPressed;
-    // robot.resetOrientation();
+    MazeDebug("run_algs started");
     arrCustom<coord> visitedMap(kMaxSize, kInvalidPosition);
     arrCustom<coord> tilesMap(kMaxSize, kInvalidPosition);
     arrCustom<Tile> tiles(kMaxSize, Tile(kInvalidPosition));
