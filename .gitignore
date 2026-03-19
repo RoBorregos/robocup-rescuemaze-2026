@@ -8,3 +8,8 @@ build
 lib
 .vscode/compile_commands.json
 .DS_Store
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.Python
