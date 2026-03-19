@@ -85,6 +85,7 @@ void motors::pidEncoders(int speedReference,bool ahead){
 
 void motors::ahead(){
     passObstacle();
+    passObstacle(); //double verification (if obstacle still in the way rotate, else, ignore)
     nearWall();
     resetTics();
     int offset=0;;
@@ -199,32 +200,25 @@ float motors::nearWall(){
 }
 
 void motors::passObstacle(){
-    float targetAngle_=targetAngle;
-    float frontLeftDistance=vlx[vlxID::frontLeft].getDistance();
-    float frontRightDistance=vlx[vlxID::frontRight].getDistance();
-    if((frontLeftDistance>kDistanceToWall) && (frontRightDistance>kDistanceToWall) ){
-        return;
+    float targetAngle_ = targetAngle;
+    float sideAngle = targetAngle_;
+    bool leftBlocked = vlx[vlxID::frontLeft].getDistance() < kDistanceToObstacle;
+    bool rightBlocked = vlx[vlxID::frontRight].getDistance() < kDistanceToObstacle;
+
+    if (leftBlocked && rightBlocked) return;
+    moveDistance(kTileLength / 5, false);
+    limitColition = true;
+    if (leftBlocked || rightBlocked) {
+        float sideAngle = targetAngle + (leftBlocked ? 25 : -25);
+        if (sideAngle >= 360) sideAngle -= 360;
+        if (sideAngle < 0)    sideAngle += 360;
+
+        rotate(sideAngle);
+        moveDistance(3 * kTileLength / 10, true);
     }
-    moveDistance(kTileLength/6,true);
-    if(frontRightDistance<kDistanceToWall){
-        // limitColition=true;
-        if(targetAngle==360){
-            targetAngle=0;
-        }
-        rotate(targetAngle+25);
-    }else if(frontLeftDistance<kDistanceToWall){
-        // limitColition=true;
-        if(targetAngle==0){
-            targetAngle=360;
-        }
-        rotate(targetAngle-25);
-    }
-    delay(200);
-    moveDistance(kTileLength/5,false);
-    delay(200);
-    targetAngle=targetAngle_;
+
     rotate(targetAngle);
-    limitColition=false;
+    limitColition = false;
 }
 /*
 void motors::limitCrash(){
@@ -488,7 +482,7 @@ bool motors::isWall(uint8_t direction){
     switch(realPos) {
         bool wall1,wall2,wall3,wall4;
         case 0:
-            wall1=vlx[vlxID::frontLeft].isWall() || vlx[vlxID::frontRight].isWall();
+            wall1=vlx[vlxID::frontLeft].isWall() && vlx[vlxID::frontRight].isWall();
             return wall1;
         case 1:
             wall2=vlx[vlxID::rightUp].isWall();
