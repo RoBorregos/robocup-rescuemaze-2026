@@ -20,10 +20,10 @@ def resolve_model_path() -> Path:
     base = Path(__file__).resolve().parent
     onnx_path = base / "weights" / "best.onnx"
     pt_path = base / "weights" / "best.pt"
-    if onnx_path.exists():
-        return onnx_path
     if pt_path.exists():
         return pt_path
+    if onnx_path.exists():
+        return onnx_path
     raise FileNotFoundError("No model found in Vision/weights (expected best.onnx or best.pt)")
 
 
