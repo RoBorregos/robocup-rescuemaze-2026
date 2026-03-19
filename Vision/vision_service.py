@@ -70,8 +70,11 @@ class Esp32Service:
                 if packet is None:
                     continue
 
+                print(f"[REQ] len={packet.payload_len} payload={[int(b) for b in packet.payload]}")
+
                 is_request, camera_id = parse_detection_request(packet)
                 if not is_request:
+                    print("[REQ] Ignored packet (not detection request)")
                     continue
 
                 victim_id = self.detector.detect_victim(camera_id)

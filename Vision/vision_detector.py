@@ -40,8 +40,43 @@ class VisionDetector:
         self.cap_right = cv2.VideoCapture(self.cam_right_idx)
         self.cap_left = cv2.VideoCapture(self.cam_left_idx)
 
+        if not self.cap_right.isOpened() or not self.cap_left.isOpened():
+            self._autodetect_cameras()
+
         if not self.cap_right.isOpened() and not self.cap_left.isOpened():
             raise RuntimeError("Could not open any camera (RIGHT/LEFT)")
+
+        print(f"[VISION] Model={self.model_path.name} conf={self.conf} imgsz={self.imgsz}")
+        print(
+            f"[VISION] RIGHT idx={self.cam_right_idx} open={self.cap_right.isOpened()} | "
+            f"LEFT idx={self.cam_left_idx} open={self.cap_left.isOpened()}"
+        )
+
+    def _autodetect_cameras(self) -> None:
+        available = []
+        for index in range(0, 6):
+            cap = cv2.VideoCapture(index)
+            if cap.isOpened():
+                ok, frame = cap.read()
+                if ok and frame is not None:
+                    available.append(index)
+            cap.release()
+
+        if not available:
+            return
+
+        if not self.cap_right.isOpened():
+            self.cap_right.release()
+            self.cam_right_idx = available[0]
+            self.cap_right = cv2.VideoCapture(self.cam_right_idx)
+
+        if not self.cap_left.isOpened():
+            self.cap_left.release()
+            if len(available) > 1:
+                self.cam_left_idx = available[1]
+            else:
+                self.cam_left_idx = available[0]
+            self.cap_left = cv2.VideoCapture(self.cam_left_idx)
 
     def close(self) -> None:
         if self.cap_right is not None:
@@ -63,7 +98,11 @@ class VisionDetector:
     def detect_victim(self, camera_id: int) -> int:
         cap = self.cap_right if camera_id == CAM_RIGHT else self.cap_left
         if cap is None or not cap.isOpened():
-            return VICTIM_NONE
+            # Fallback to the other camera if requested one is unavailable
+            fallback = self.cap_left if camera_id == CAM_RIGHT else self.cap_right
+            if fallback is None or not fallback.isOpened():
+                return VICTIM_NONE
+            cap = fallback
 
         ok, frame = cap.read()
         if not ok or frame is None:
@@ -80,6 +119,8 @@ class VisionDetector:
             return VICTIM_NONE
 
         best_idx = int(boxes.conf.argmax().item())
+        best_conf = float(boxes.conf[best_idx].item())
         class_id = int(boxes.cls[best_idx].item())
         class_name = names.get(class_id, str(class_id)) if isinstance(names, dict) else str(class_id)
+        print(f"[VISION] top_class={class_name} conf={best_conf:.3f}")
         return self._class_to_victim_id(class_name)
