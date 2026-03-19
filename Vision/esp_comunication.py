@@ -9,7 +9,11 @@ import time
 import struct
 import _thread
 import binascii
-from model_class2 import Model
+
+try:
+    from model_class2 import Model
+except ModuleNotFoundError:
+    Model = None
 
 """"
 #the protocol use 8 bytes
@@ -21,7 +25,7 @@ from model_class2 import Model
 """
 class Esp32(): 
     def __init__(self, port=Constants.serial_port, baudrate=Constants.baud_rate, timeout=1):
-        self.model=Model()
+        self.model = Model() if Model is not None else None
         self.port = port
         self.port_name = port
         self.baudrate = baudrate
@@ -230,6 +234,9 @@ class Esp32():
         return 1
 #Main funtion
     def sentDetection(self):
+        if self.model is None:
+            print("model_class2.py no encontrado; sentDetection() requiere ese módulo.")
+            return self.FAIL, 0
         self.recv()
         if self.payload_ack==b'\x02':
             detection=self.model.getDetectionRight()
