@@ -1,3 +1,9 @@
+"""Binary UART protocol definitions and helpers for Vision.
+
+Contains packet constants, parser state machine, name utilities,
+and packet build/parse helper functions.
+"""
+
 from __future__ import annotations
 
 import struct

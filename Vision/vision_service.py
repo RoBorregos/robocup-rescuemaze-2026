@@ -1,3 +1,9 @@
+"""UART service layer between Raspberry Pi vision and ESP32.
+
+Reads request packets, calls the detector, and sends response packets
+using the protocol helpers.
+"""
+
 from __future__ import annotations
 
 import time

@@ -1,3 +1,9 @@
+"""YOLO-based victim detector for LEFT and RIGHT cameras.
+
+Handles camera initialization (OpenCV/Picamera2), frame capture,
+inference execution, and mapping classes to victim IDs.
+"""
+
 from __future__ import annotations
 
 import os
