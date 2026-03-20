@@ -14,46 +14,39 @@ void VLX::begin(){
     if (!VLX_.begin()) {
         Serial.println("Error on sensor VL53L0X!"); while (1);
     }
+    VLX_.setMeasurementTimingBudgetMicroSeconds(kTimingBudget);
+    VLX_.startRangeContinuous();
     Serial.println("VL53L0X inicilaized properly.");  
 }
 
 void VLX::setMux(const uint8_t posMux) {
     mux_.setNewChannel(posMux);
 }
-void VLX::updateDistance() {
-    mux_.selectChannel();
-    VLX_.rangingTest(&measure, false);
-}
+
 float VLX::getDistance(){
-    updateDistance();
-    if (measure.RangeStatus != 4) {
-    distance=measure.RangeMilliMeter/10;
-    return distance;
-    }else{
-        updateDistance();
-        if (measure.RangeStatus != 4) {
-        distance=measure.RangeMilliMeter/10;
+    mux_.selectChannel();
+
+    uint16_t rawRange = VLX_.readRange();
+    if (VLX_.timeoutOccurred()){
+        // preserve previous valid distance if timeout
         return distance;
-        }
     }
+
+    distance = (float)(rawRange) / 10.0f;
     return distance;
 }
 
 void VLX::printDistance(){ 
-    updateDistance();
-    if (measure.RangeStatus != 4) {
+    float printedDistance = getDistance();
+    if (printedDistance != 819.0) {
         Serial.print("Distance: ");
-        Serial.print(measure.RangeMilliMeter);
+        Serial.print(distance);
         Serial.println(" mm");
     } else {
         Serial.println("Out of range.");
-    }
-    delay(500); 
-    }
+    } 
+}
+
 bool VLX::isWall(){
-    if(getDistance()<kDistanceToWall){
-        return true;
-    }else{
-        return false;
-    }
+    return (getDistance()<kDistanceToWall);
 }
