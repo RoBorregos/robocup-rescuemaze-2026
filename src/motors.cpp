@@ -208,7 +208,7 @@ void motors::passObstacle(){
     bool leftBlocked = vlx[vlxID::frontLeft].getDistance() < kDistanceToObstacle;
     bool rightBlocked = vlx[vlxID::frontRight].getDistance() < kDistanceToObstacle;
 
-    if (leftBlocked && rightBlocked) return;
+    if ((leftBlocked && rightBlocked) || (!leftBlocked && !rightBlocked)) return;
     moveDistance(kTileLength / 5, false);
     limitColition = true;
     if (leftBlocked || rightBlocked) {
@@ -219,8 +219,8 @@ void motors::passObstacle(){
         rotate(sideAngle);
         moveDistance(3 * kTileLength / 10, true);
     }
-
-    rotate(targetAngle);
+    
+    rotate(targetAngle_);
     limitColition = false;
 }
 /*
