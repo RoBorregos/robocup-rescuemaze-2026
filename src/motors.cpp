@@ -204,10 +204,14 @@ float motors::nearWall(){
 void motors::passObstacle(){
     float targetAngle_ = targetAngle;
     float sideAngle = targetAngle_;
+    float angle = bno.getOrientationX();
+    if (abs(targetAngle_- angle)>=2) rotate(targetAngle_);
     bool leftBlocked = vlx[vlxID::frontLeft].getDistance() < kDistanceToObstacle;
     bool rightBlocked = vlx[vlxID::frontRight].getDistance() < kDistanceToObstacle;
 
-    if (leftBlocked && rightBlocked) return;
+    if (!leftBlocked && !rightBlocked) return;  // No obstacle, do nothing
+    if (leftBlocked && rightBlocked) return;    // Completely blocked, can't pass
+
     moveDistance(kTileLength / 5, false);
     limitColition = true;
     if (leftBlocked || rightBlocked) {
@@ -218,8 +222,7 @@ void motors::passObstacle(){
         rotate(sideAngle);
         moveDistance(3 * kTileLength / 10, true);
     }
-
-    rotate(targetAngle);
+    rotate(targetAngle_);
     limitColition = false;
 }
 /*
