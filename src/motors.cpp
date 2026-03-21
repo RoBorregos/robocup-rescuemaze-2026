@@ -492,43 +492,46 @@ float motors::AverageRightDistance(){
 }
 */
 bool motors::isWall(uint8_t direction){
-    uint8_t relativeDir;
+    uint8_t relativeDir = 0;
     int deltaTargetAngle=static_cast<int>(targetAngle);
     switch(deltaTargetAngle) {
         case 0:
-            relativeDir=0; 
         case 360:
             relativeDir=0;
             break;
         case 90:
-            relativeDir=1; 
+            relativeDir=1;
             break;
         case 180:
-            relativeDir=2; 
+            relativeDir=2;
             break;
         case 270:
-            relativeDir=3; 
+            relativeDir=3;
             break;
-        default: 
-          break;
+        default:
+            // Unexpected orientation, keep default (front)
+            relativeDir=0;
+            break;
     }
-    uint8_t realPos=rulet[relativeDir][direction];
+    uint8_t realPos = rulet[relativeDir][direction];
+    bool frontLeft = vlx[vlxID::frontLeft].isWall();
+    bool frontRight = vlx[vlxID::frontRight].isWall();
+    bool right = vlx[vlxID::right].isWall();
+    bool back = vlx[vlxID::back].isWall();
+    bool left = vlx[vlxID::left].isWall();
+
     switch(realPos) {
-        bool wall1,wall2,wall3,wall4;
         case 0:
-            wall1=vlx[vlxID::frontLeft].isWall() && vlx[vlxID::frontRight].isWall();
-            return wall1;
+            // front wall if any front sensor sees obstacle, safer for turns
+            return frontLeft&&frontRight;
         case 1:
-            wall2=vlx[vlxID::right].isWall();
-            return wall2;
+            return right;
         case 2:
-            wall3=vlx[vlxID::back].isWall();
-            return wall3;
+            return back;
         case 3:
-            wall4=vlx[vlxID::left].isWall();
-            return wall4;
-        default: 
-          return false;
+            return left;
+        default:
+            return false;
     }
 }
 
