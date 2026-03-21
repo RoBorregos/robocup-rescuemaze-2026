@@ -18,7 +18,6 @@ void motors::setupMotors(){
     Wire.begin(21, 22);
     Wire.setClock(400000);
     //screenBegin();
-    //screenPrint("r");
     bno.setupBNO();
     setupVlx(vlxID::left);
     setupVlx(vlxID::frontRight);
@@ -85,8 +84,8 @@ void motors::pidEncoders(int speedReference,bool ahead){
 
 
 void motors::ahead(){
-    passObstacle();
-    passObstacle(); //double verification (if obstacle still in the way rotate, else, ignore)
+   passObstacle();
+   passObstacle(); //double verification (if obstacle still in the way rotate, else, ignore)
     nearWall();
     resetTics();
     int offset=0;;
@@ -682,19 +681,17 @@ void motors::checkpointElection(){
     } 
     return;
 }
-/*
+
 void motors::victimSequency(){
     float current=millis();
     while((millis()-current)<5100){
         screenPrint("Victim");
-        leds.setBlue();
         delay(500);
         screenPrint(" ");
-        leds.turnOff();
         delay(500);
     }
-    leds.setWhite(); 
 }
+
 void motors::harmedVictim(){
     victimSequency();
     if(kitState==kitID::kRight){
@@ -707,6 +704,7 @@ void motors::harmedVictim(){
     // screenPrint("");
 
 }
+
 void motors::stableVictim(){
     // screenPrint("Stable");
     victimSequency();
@@ -718,11 +716,13 @@ void motors::stableVictim(){
     } 
     // screenPrint("");
 }
+
 void motors::unharmedVictim(){
     // screenPrint("Unharmed");
     victimSequency();
     // screenPrint("");
 }
+
 void motors::kitLeft(uint8_t n){
     uint16_t dt=0;
     for(uint8_t i=0;i<n;i++){ 
@@ -771,14 +771,6 @@ void motors::wifiPrint(String message, float i){
     // client.print(message);
     // client.println(i);
     // Serial.println("Enviado: ");
-}
-
-*/
-void motors::wait(unsigned long targetTime){
-    unsigned long initialTime=millis();
-    while((millis()-initialTime)<targetTime){
-        if(buttonPressed) break;
-    }
 }
 
 void motors::setupTCS() {
