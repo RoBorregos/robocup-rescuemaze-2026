@@ -1,0 +1,17 @@
+name: Clang-Format Check
+
+on: [push, pull_request]
+
+jobs:
+  format-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run clang-format style check
+        uses: jidicula/clang-format-action@v4.17.0
+        with:
+          clang-format-version: '18'
+          check-path: 'src include'
+          fallback-style: 'LLVM'
