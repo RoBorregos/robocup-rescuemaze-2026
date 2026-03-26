@@ -58,7 +58,7 @@ public:
   uint8_t victim;
   uint8_t left_victim;
   uint8_t right_victim;
-  uint32_t waitingTime = 5000;  // 5 seconds waiting for response
+  uint32_t waitingTime = 300;  // 5 seconds waiting for response
 
 private:
   // Packet parsing states

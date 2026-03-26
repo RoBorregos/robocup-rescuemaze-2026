@@ -1,5 +1,6 @@
 #include "maze.h"
 #include "Arduino.h"
+#include "raspy.h"
 
 coord inicio = {kBaseCoord, kBaseCoord, kBaseCoord};
 coord robotCoord = {kBaseCoord, kBaseCoord, kBaseCoord};
@@ -10,11 +11,13 @@ uint8_t level = kBaseCoord;
 coord past;
 
 namespace {
-constexpr bool kMazeDebugEnabled = false;
+constexpr bool kMazeDebugEnabled = true;
+constexpr uint16_t kVictimDetectedDisplayMs = 2000;
 
 void MazeDebug(const char* message) {
     if (kMazeDebugEnabled) {
         Serial.println(message);
+        robot.screenPrint(message);
     }
 }
 
@@ -31,52 +34,83 @@ void MazeDebugCoord(const char* label, const coord& value) {
     Serial.print(", ");
     Serial.print(static_cast<int>(value.z));
     Serial.println(")");
+    
+    String debug_str = String(label) + " (" + String(value.x) + "," + String(value.y) + "," + String(value.z) + ")";
+    robot.screenPrint(debug_str);
+}
+
+void DetectVictimOnTile(Tile* current_tile) {
+    if (current_tile == nullptr || current_tile->hasVictim() || robot.buttonPressed) {
+        return;
+    }
+
+    robot.screenPrint("Detecting...");
+    const uint8_t detected_victim = raspy.getDetection();
+    if (detected_victim == VICTIM_NONE) {
+        robot.screenPrint("No victim");
+        return;
+    }
+
+    String victim_name;
+    if (detected_victim == VICTIM_PHI) {
+        victim_name = "PHI";
+        robot.harmedVictim();
+    } else if (detected_victim == VICTIM_PSI) {
+        victim_name = "PSI";
+        robot.stableVictim();
+    } else if (detected_victim == VICTIM_OMEGA) {
+        victim_name = "OMEGA";
+        robot.unharmedVictim();
+    } else {
+        victim_name = "Unknown";
+    }
+
+    robot.victim = detected_victim;
+    robot.kitState = (raspy.camera == CAM_LEFT) ? kitID::kLeft : kitID::kRight;
+    
+    String cam_side = (raspy.camera == CAM_LEFT) ? "L" : "R";
+    String display = "Victim: " + victim_name + " (" + cam_side + ")";
+    robot.screenPrint(display);
+    delay(kVictimDetectedDisplayMs);
+
+    current_tile->setVictim();
+    robot.victim = 0;
+    robot.kitState = kitID::kNone;
 }
 }
 
 maze::maze(){}
-// logic
-/*
-void detection(Tile* curr){
-  if(!curr -> hasVictim()){
-        if(robot.buttonPressed) return;
-        if(robot.victim == 1) robot.harmedVictim();
-        else if(robot.victim == 2) robot.stableVictim();
-        else if(robot.victim == 3) robot.unharmedVictim();
-        if(robot.victim != 0) curr -> setVictim();
-        robot.victim = 0;
-        robot.kitState=kitID::kNone;
-        
-    }
-}  */ 
 
 void maze::followPath(Stack& path, arrCustom<Tile>& tiles, arrCustom<coord>& tilesMap){
     const coord& init = path.top();
     Tile* curr = &tiles.getValue(tilesMap.getIndex(init));
     path.pop();
+    String start_msg = "followPath: start (" + String(init.x) + "," + String(init.y) + ")";
+    MazeDebug(start_msg.c_str());
     while(!path.empty()){
+        DetectVictimOnTile(curr);
         const coord& next = path.top();
         MazeDebugCoord("followPath next", next);
         path.pop(); 
         if (next.x > robotCoord.x) {
             // if(robotOrientation != 90) detection(curr);
-            if(robotOrientation == 270) robot.rotate(180);if(robot.buttonPressed) break; /* detection(curr); */ robot.rotate(90); if(robot.buttonPressed) break;
-            else robot.rotate(90); if(robot.buttonPressed) break; /* detection(curr); */ 
+            if(robotOrientation == 270) robot.rotate(180);if(robot.buttonPressed) break; DetectVictimOnTile(curr); robot.rotate(90); if(robot.buttonPressed) break;
+            else robot.rotate(90); if(robot.buttonPressed) break; DetectVictimOnTile(curr); // case in which the robot has to go backwards in a dead end
             robotOrientation = 90;
         } else if (next.x < robotCoord.x) {
             // if(robotOrientation != 270) detection(curr);
-            if(robotOrientation == 90) robot.rotate(180);if(robot.buttonPressed) break; /* detection(curr); */ robot.rotate(270); if(robot.buttonPressed) break;
-            else robot.rotate(270); if(robot.buttonPressed) break; /* detection(curr); */ // case in which the robot has to go backwards in a dead end
+            if(robotOrientation == 90) robot.rotate(180);if(robot.buttonPressed) break; DetectVictimOnTile(curr); robot.rotate(270); if(robot.buttonPressed) break;
+            else robot.rotate(270); if(robot.buttonPressed) break;DetectVictimOnTile(curr);// case in which the robot has to go backwards in a dead end
             robotOrientation = 270;
         } else if (next.y > robotCoord.y) {
             // if(robotOrientation != 0) detection(curr); 
-            if(robotOrientation == 180)robot.rotate(90);if(robot.buttonPressed) break; /* detection(curr); */ robot.rotate(0); if(robot.buttonPressed) break;
-            else robot.rotate(0); if(robot.buttonPressed) break; /* detection(curr); */ // case in which the robot has to go backwards in a dead end
+            if(robotOrientation == 180)robot.rotate(90);if(robot.buttonPressed) break; DetectVictimOnTile(curr); robot.rotate(0); if(robot.buttonPressed) break;
+            else robot.rotate(0); if(robot.buttonPressed) break; DetectVictimOnTile(curr); // case in which the robot has to go backwards in a dead end
             robotOrientation = 0;
         } else if (next.y < robotCoord.y) {
             // if(robotOrientation != 180) detection(curr); //cases in which the robot has to turn 180 degrees to follow the path, so we want to detect before turning in case there is a victim in the current tile
-            if(robotOrientation == 0) robot.rotate(90); if(robot.buttonPressed) break; /* detection(curr); */ robot.rotate(180); if(robot.buttonPressed) break; // case in which the robot has to go backwards in a dead end
-            else robot.rotate(180); if(robot.buttonPressed) break; /* detection(curr); */ // normal case in which the robot has to follow a path
+            if(robotOrientation == 0) robot.rotate(90); if(robot.buttonPressed) break; DetectVictimOnTile(curr); robot.rotate(180); if(robot.buttonPressed) break; // case in which the robot has to go backwards in a dead end
+            else robot.rotate(180); if(robot.buttonPressed) break; DetectVictimOnTile(curr); // normal case in which the robot has to follow a path
             robotOrientation = 180;
         }
         if(robot.buttonPressed) break;
@@ -221,6 +255,9 @@ void maze::dfs(arrCustom<coord>& visitedMap, arrCustom<Tile>& tiles, arrCustom<c
         }
         }
         currentTile = &tiles.getValue(tilesMap.getIndex(current));
+        String tile_msg = "Tile: (" + String(current.x) + "," + String(current.y) + "," + String(current.z) + ")";
+        MazeDebug(tile_msg.c_str());
+        DetectVictimOnTile(currentTile);
         if(robot.rampState != 0){
             int rampDirection = robot.rampState == 1 ? 1 : -1;
             robot.rampState = 0;
@@ -381,11 +418,12 @@ void maze::dfs(arrCustom<coord>& visitedMap, arrCustom<Tile>& tiles, arrCustom<c
     if(robot.buttonPressed==false) dijkstra(robotCoord, inicio, tilesMap, tiles); 
 }
 void maze::run_algs(){
-    MazeDebug("run_algs started");
+    MazeDebug("=== Maze Start ===");
     arrCustom<coord> visitedMap(kMaxSize, kInvalidPosition);
     arrCustom<coord> tilesMap(kMaxSize, kInvalidPosition);
     arrCustom<Tile> tiles(kMaxSize, Tile(kInvalidPosition));
     tilesMap.push_back(robotCoord);
     tiles.getValue(tilesMap.getIndex(robotCoord)) = Tile(robotCoord);
     dfs(visitedMap, tiles, tilesMap);
+    MazeDebug("=== Maze Done ===");
 }
