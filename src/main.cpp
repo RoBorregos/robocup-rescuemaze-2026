@@ -1,15 +1,15 @@
-#include <Arduino.h>
 #include "Encoder.h"
-#include "maze.h"
 #include "Test.h"
+#include "maze.h"
 #include "raspy.h"
+#include <Arduino.h>
 maze m;
 
 void setup() {
   Serial.begin(115200);
   delay(500);
   robot.setupMotors();
-  
+
   robot.screenBegin();
   robot.screenPrint("INIT");
   Serial.println("=== RoboCup Rescue Maze ===");
@@ -18,14 +18,15 @@ void setup() {
   robot.screenPrint("READY");
   Serial.println("Connected. getDetection() ready.");
 
-  pinMode(Pins::checkpointPin,INPUT_PULLDOWN);
-  attachInterrupt(digitalPinToInterrupt(Pins::encoder[MotorID::kFrontLeft]), Interrups::frontLeftEncoder, RISING);
-  attachInterrupt(digitalPinToInterrupt(Pins::encoder[MotorID::kFrontRight]), Interrups::frontRightEncoder, RISING);
-  attachInterrupt(digitalPinToInterrupt(Pins::encoder[MotorID::kBackLeft]), Interrups::backLeftEncoder, RISING);
-  attachInterrupt(digitalPinToInterrupt(Pins::encoder[MotorID::kBackRight]), Interrups::backRightEncoder, RISING);
-
+  pinMode(Pins::checkpointPin, INPUT_PULLDOWN);
+  attachInterrupt(digitalPinToInterrupt(Pins::encoder[MotorID::kFrontLeft]),
+                  Interrups::frontLeftEncoder, RISING);
+  attachInterrupt(digitalPinToInterrupt(Pins::encoder[MotorID::kFrontRight]),
+                  Interrups::frontRightEncoder, RISING);
+  attachInterrupt(digitalPinToInterrupt(Pins::encoder[MotorID::kBackLeft]),
+                  Interrups::backLeftEncoder, RISING);
+  attachInterrupt(digitalPinToInterrupt(Pins::encoder[MotorID::kBackRight]),
+                  Interrups::backRightEncoder, RISING);
 }
 
-void loop() {
- m.run_algs();
-}
+void loop() { m.run_algs(); }
