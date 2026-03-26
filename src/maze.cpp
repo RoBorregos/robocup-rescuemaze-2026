@@ -94,23 +94,23 @@ void maze::followPath(Stack& path, arrCustom<Tile>& tiles, arrCustom<coord>& til
         path.pop(); 
         if (next.x > robotCoord.x) {
             // if(robotOrientation != 90) detection(curr);
-            if(robotOrientation == 270) robot.rotate(180);if(robot.buttonPressed) break; /* detection(curr); */ robot.rotate(90); if(robot.buttonPressed) break;
-            else robot.rotate(90); if(robot.buttonPressed) break; /* detection(curr); */ 
+            if(robotOrientation == 270) robot.rotate(180);if(robot.buttonPressed) break; DetectVictimOnTile(curr); robot.rotate(90); if(robot.buttonPressed) break;
+            else robot.rotate(90); if(robot.buttonPressed) break; DetectVictimOnTile(curr); // case in which the robot has to go backwards in a dead end
             robotOrientation = 90;
         } else if (next.x < robotCoord.x) {
             // if(robotOrientation != 270) detection(curr);
-            if(robotOrientation == 90) robot.rotate(180);if(robot.buttonPressed) break; /* detection(curr); */ robot.rotate(270); if(robot.buttonPressed) break;
-            else robot.rotate(270); if(robot.buttonPressed) break; /* detection(curr); */ // case in which the robot has to go backwards in a dead end
+            if(robotOrientation == 90) robot.rotate(180);if(robot.buttonPressed) break; DetectVictimOnTile(curr); robot.rotate(270); if(robot.buttonPressed) break;
+            else robot.rotate(270); if(robot.buttonPressed) break;DetectVictimOnTile(curr);// case in which the robot has to go backwards in a dead end
             robotOrientation = 270;
         } else if (next.y > robotCoord.y) {
             // if(robotOrientation != 0) detection(curr); 
-            if(robotOrientation == 180)robot.rotate(90);if(robot.buttonPressed) break; /* detection(curr); */ robot.rotate(0); if(robot.buttonPressed) break;
-            else robot.rotate(0); if(robot.buttonPressed) break; /* detection(curr); */ // case in which the robot has to go backwards in a dead end
+            if(robotOrientation == 180)robot.rotate(90);if(robot.buttonPressed) break; DetectVictimOnTile(curr); robot.rotate(0); if(robot.buttonPressed) break;
+            else robot.rotate(0); if(robot.buttonPressed) break; DetectVictimOnTile(curr); // case in which the robot has to go backwards in a dead end
             robotOrientation = 0;
         } else if (next.y < robotCoord.y) {
             // if(robotOrientation != 180) detection(curr); //cases in which the robot has to turn 180 degrees to follow the path, so we want to detect before turning in case there is a victim in the current tile
-            if(robotOrientation == 0) robot.rotate(90); if(robot.buttonPressed) break; /* detection(curr); */ robot.rotate(180); if(robot.buttonPressed) break; // case in which the robot has to go backwards in a dead end
-            else robot.rotate(180); if(robot.buttonPressed) break; /* detection(curr); */ // normal case in which the robot has to follow a path
+            if(robotOrientation == 0) robot.rotate(90); if(robot.buttonPressed) break; DetectVictimOnTile(curr); robot.rotate(180); if(robot.buttonPressed) break; // case in which the robot has to go backwards in a dead end
+            else robot.rotate(180); if(robot.buttonPressed) break; DetectVictimOnTile(curr); // normal case in which the robot has to follow a path
             robotOrientation = 180;
         }
         if(robot.buttonPressed) break;
