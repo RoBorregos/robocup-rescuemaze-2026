@@ -50,11 +50,7 @@ void motors::PID_Wheel(int targetSpeed, int i) {
   int speed_setpoint = targetSpeed;
   int reference_pwm;
   reference_pwm = motor[i].getSpeed();
-  Serial.println("reference_pwm");
-  Serial.println(reference_pwm);
   int speedTics = motor[i].getTicsSpeed();
-  Serial.println("speedTics");
-  Serial.println(speedTics);
   float error = myPID[i].calculate_PID(speed_setpoint, speedTics);
   int speed = reference_pwm + error;
   speed = constrain(speed, 0, 255);
@@ -74,8 +70,6 @@ void motors::pidEncoders(int speedReference, bool ahead) {
   float AngleError = pidBno.calculate_PID(
       targetAngle + changeAngle, (targetAngle == 0 ? z_rotation : angle));
   AngleError = constrain(AngleError, -17, 17);
-  // Serial.println(AngleError);
-  Serial.println(AngleError);
   if (!ahead)
     AngleError = -AngleError;
   PID_Wheel(speedReference + AngleError, MotorID::kFrontLeft);
@@ -188,12 +182,12 @@ void motors::ahead() {
     if (!encoder) {
       if ((vlx[vlxID::left].isWall())&&vlx[vlxID::right].isWall()) {
         (vlx[vlxID::right].getDistance()<= vlx[vlxID::left].getDistance()) ? (setright()):(setleft());
-        float error=rampUpPID.calculate_PID(0,(vlx[vlxID::right].distance-vlx[vlxID::left].distance));
-        error=constrain(error,-17,17);
-        PID_Wheel(-error,MotorID::kFrontLeft);
-        PID_Wheel(-error,MotorID::kBackLeft);
-        PID_Wheel(error + 5,MotorID::kFrontRight);
-        PID_Wheel(error,MotorID::kBackRight);
+        float error = rampUpPID.calculate_PID(0,(vlx[vlxID::right].distance-vlx[vlxID::left].distance));
+        error = constrain(error,-17,17);
+        PID_Wheel(-error, MotorID::kFrontLeft);
+        PID_Wheel(-error, MotorID::kBackLeft);
+        PID_Wheel(error + 5, MotorID::kFrontRight);
+        PID_Wheel(error, MotorID::kBackRight);
     }
   } 
   stop();
@@ -258,7 +252,7 @@ void motors::passObstacle() {
   if (leftBlocked && rightBlocked)
     return; // Completely blocked, can't pass
 
-  if (vlx[vlxID::back].getDistance()>20){
+  if (vlx[vlxID::back].getDistance() > 20){
     moveDistance(kTileLength / 5, false);
   }
   limitColition = true;
@@ -595,9 +589,9 @@ bool motors::isWall(uint8_t direction) {
   uint8_t realPos = rulet[relativeDir][direction];
   bool frontLeft = vlx[vlxID::frontLeft].isWall();
   bool frontRight = vlx[vlxID::frontRight].isWall();
-  bool right = vlx[vlxID::right].getDistance()<20;
+  bool right = vlx[vlxID::right].getDistance() < 20;
   bool back = vlx[vlxID::back].isWall();
-  bool left = vlx[vlxID::left].getDistance()<20;
+  bool left = vlx[vlxID::left].getDistance() < 20;
 
   switch (realPos) {
   case 0:
