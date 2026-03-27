@@ -32,17 +32,17 @@ float VLX::getDistance() {
   }
 
   if (status != 4) {
-        distance = (float)(rawRange) / 10.0f;
-        return distance;
+    distance = (float)(rawRange) / 10.0f;
+    return distance;
   } else {
     rawRange = VLX_.readRange();
     status = VLX_.readRangeStatus();
-        if (status != 4) {
-        distance = (float)(rawRange) / 10.0f;
-        return distance;
-        }
+    if (status != 4) {
+      distance = (float)(rawRange) / 10.0f;
+      return distance;
     }
-    return 819.0f;
+  }
+  return 819.0f;
 }
 
 void VLX::printDistance() {
