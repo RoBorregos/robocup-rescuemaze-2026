@@ -176,20 +176,23 @@ void motors::ahead() {
   slope = false;
   stop();
   float angle = bno.getOrientationX();
-  if (abs(targetAngle_ - angle)>=10) {
+  if (abs(targetAngle_ - angle) >= 10) {
     rotate(targetAngle_);
   }
-    if (!encoder) {
-      if ((vlx[vlxID::left].isWall())&&vlx[vlxID::right].isWall()) {
-        (vlx[vlxID::right].getDistance()<= vlx[vlxID::left].getDistance()) ? (setright()):(setleft());
-        float error = rampUpPID.calculate_PID(0,(vlx[vlxID::right].distance-vlx[vlxID::left].distance));
-        error = constrain(error,-17,17);
-        PID_Wheel(-error, MotorID::kFrontLeft);
-        PID_Wheel(-error, MotorID::kBackLeft);
-        PID_Wheel(error + 5, MotorID::kFrontRight);
-        PID_Wheel(error, MotorID::kBackRight);
+  if (!encoder) {
+    if ((vlx[vlxID::left].isWall()) && vlx[vlxID::right].isWall()) {
+      (vlx[vlxID::right].getDistance() <= vlx[vlxID::left].getDistance())
+          ? (setright())
+          : (setleft());
+      float error = rampUpPID.calculate_PID(
+          0, (vlx[vlxID::right].distance - vlx[vlxID::left].distance));
+      error = constrain(error, -17, 17);
+      PID_Wheel(-error, MotorID::kFrontLeft);
+      PID_Wheel(-error, MotorID::kBackLeft);
+      PID_Wheel(error + 5, MotorID::kFrontRight);
+      PID_Wheel(error, MotorID::kBackRight);
     }
-  } 
+  }
   stop();
   resetTics();
   // checkTileColor();
@@ -252,7 +255,7 @@ void motors::passObstacle() {
   if (leftBlocked && rightBlocked)
     return; // Completely blocked, can't pass
 
-  if (vlx[vlxID::back].getDistance() > 20){
+  if (vlx[vlxID::back].getDistance() > 20) {
     moveDistance(kTileLength / 5, false);
   }
   limitColition = true;
@@ -401,15 +404,15 @@ float motors::changeSpeedMove(bool encoders, bool rotate, int targetDistance,
   float missingDistance, missingAngle;
   if (rotate == true) {
     if (limitColition) {
-        kMinSpeedRotate = 10;
+      kMinSpeedRotate = 10;
     }
     missingAngle = abs(targetAngle - (targetAngle == 0 ? z_rotation : angle));
     speed = map(missingAngle, 90, 0, kMaxSpeedRotate, kMinSpeedRotate);
     speed = constrain(speed, kMinSpeedRotate, kMaxSpeedRotate);
-    PID_Wheel(speed,MotorID::kFrontLeft);
-    PID_Wheel(speed,MotorID::kBackLeft);
-    PID_Wheel(speed+5,MotorID::kFrontRight);
-    PID_Wheel(speed,MotorID::kBackRight);
+    PID_Wheel(speed, MotorID::kFrontLeft);
+    PID_Wheel(speed, MotorID::kBackLeft);
+    PID_Wheel(speed + 5, MotorID::kFrontRight);
+    PID_Wheel(speed, MotorID::kBackRight);
     return 0;
   } else {
     if (encoders == true) {
