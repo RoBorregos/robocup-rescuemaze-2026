@@ -1,8 +1,8 @@
-#if 0  // DISABLED: Using raspy.h/raspy.cpp instead
-#include <Arduino.h>
-#include <Wire.h>
+#if 0 // DISABLED: Using raspy.h/raspy.cpp instead
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include <Arduino.h>
+#include <Wire.h>
 
 static const uint32_t LINK_BAUD = 115200;
 static const bool ENABLE_DEBUG_LOGS = true;
