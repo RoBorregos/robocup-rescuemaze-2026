@@ -152,6 +152,18 @@ def classify_color_at(hsv_img, cx, cy, sample_r=4):
     if x0 >= x1 or y0 >= y1 or patch.size == 0:
         return "Black"
 
+    patch_s = patch[:, :, 1]
+    patch_v = patch[:, :, 2]
+    mean_s = float(np.mean(patch_s))
+    mean_v = float(np.mean(patch_v))
+    dark_ratio = float(np.mean(patch_v < 60))
+
+    if mean_v < 58 or dark_ratio > 0.60:
+        return "Black"
+
+    if mean_v < 70 and mean_s < 85:
+        return "Black"
+
     best_color = "Black"
     best_count = 0
 
@@ -211,10 +223,11 @@ def analyze_rings(roi_bgr):
             - Sample HSV color at midpoint of each band
     """
     h, w = roi_bgr.shape[:2]
+    roi_raw = roi_bgr.copy()
     roi_bgr = normalize_lighting(roi_bgr)
     gray = cv2.cvtColor(roi_bgr, cv2.COLOR_BGR2GRAY)
     blurred = cv2.GaussianBlur(gray, (5, 5), 1.5)
-    hsv = cv2.cvtColor(roi_bgr, cv2.COLOR_BGR2HSV)
+    hsv = cv2.cvtColor(roi_raw, cv2.COLOR_BGR2HSV)
 
     debug = roi_bgr.copy()
     ring_colors = ["Black"] * 5
