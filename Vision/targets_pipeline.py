@@ -1,10 +1,15 @@
 
-import cv2
-import numpy as np
 import argparse
+import os
 from pathlib import Path
 from collections import deque
+
+import cv2
+import numpy as np
 from ultralytics import YOLO
+
+from detector import VisionDetector
+from protocol import CAM_LEFT, CAM_RIGHT
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -376,6 +381,8 @@ def main():
                         help="Source: image/video path or camera index (default: 0)")
     parser.add_argument("--save",   default="",
                         help="Save output to this path (e.g., out.jpg or out.mp4)")
+    parser.add_argument("--headless", action="store_true",
+                        help="Disable OpenCV windows (useful in SSH/headless)")
     args = parser.parse_args()
 
     model_path = resolve_model_path(args.model)
@@ -406,39 +413,74 @@ def main():
     else:
         # Video or camera
         source = int(args.source) if args.source.isdigit() else args.source
-        cap = cv2.VideoCapture(source)
+        has_display = (not args.headless) and (not os.environ.get("SSH_CONNECTION")) and bool(
+            os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")
+        )
 
-        if not cap.isOpened():
-            print(f"   Could not open source: {args.source}")
-            return
+        camera_handler = None
+        cap = None
+        camera_id = None
+        if isinstance(source, int):
+            camera_handler = VisionDetector()
+            camera_id = CAM_LEFT if source == CAM_LEFT else CAM_RIGHT
+            print(f"  Using VisionDetector camera backend for CAM={camera_id}")
+        else:
+            cap = cv2.VideoCapture(source)
+            if not cap.isOpened():
+                print(f"   Could not open source: {args.source}")
+                return
 
         writer = None
-        if args.save:
+        if args.save and cap is not None:
             fps = cap.get(cv2.CAP_PROP_FPS) or 30
-            fw  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-            fh  = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            fw = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            fh = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
             writer = cv2.VideoWriter(
                 args.save,
                 cv2.VideoWriter_fourcc(*"mp4v"),
-                fps, (fw, fh)
+                fps,
+                (fw, fh),
             )
 
         print("  Processing... press Q to quit.")
+        no_frame_count = 0
         while True:
-            ret, frame = cap.read()
+            if camera_handler is not None:
+                ret, frame = camera_handler.read_frame(camera_id)
+            else:
+                ret, frame = cap.read()
+
             if not ret:
-                break
+                no_frame_count += 1
+                if no_frame_count >= 20:
+                    print("  No frames received from source; stopping.")
+                    break
+                continue
+            no_frame_count = 0
+
+            if writer is None and args.save:
+                frame_h, frame_w = frame.shape[:2]
+                writer = cv2.VideoWriter(
+                    args.save,
+                    cv2.VideoWriter_fourcc(*"mp4v"),
+                    30,
+                    (frame_w, frame_h),
+                )
 
             result = process_frame(frame, model, label_history=label_history)
 
-            cv2.imshow("Target Pipeline", result)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
+            if has_display:
+                cv2.imshow("Target Pipeline", result)
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
 
             if writer:
                 writer.write(result)
 
-        cap.release()
+        if cap is not None:
+            cap.release()
+        if camera_handler is not None:
+            camera_handler.close()
         if writer:
             writer.release()
         cv2.destroyAllWindows()
