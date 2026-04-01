@@ -238,7 +238,9 @@ def analyze_rings(roi_bgr):
         cx, cy = w // 2, h // 2
         outer_r = min_dim // 2 - 2
     else:
-        c = np.round(circles[0][0]).astype(int)
+        candidates = np.round(circles[0]).astype(int)
+        largest_idx = int(np.argmax(candidates[:, 2]))
+        c = candidates[largest_idx]
         cx, cy, outer_r = int(c[0]), int(c[1]), int(c[2])
 
     cx = int(np.clip(cx, 0, w - 1))
