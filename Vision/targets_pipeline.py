@@ -27,7 +27,7 @@ def resolve_model_path(model_arg: str) -> Path:
     searched_paths = "\n".join(f"- {path}" for path in candidates)
     raise FileNotFoundError(
         "YOLO model (.pt) was not found.\n"
-        "Pass --model best.pt (if it is in weights) or a valid path.\n"
+        "Pass --model target.pt (if it is in weights) or a valid path.\n"
         f"Searched paths:\n{searched_paths}"
     )
 
@@ -370,7 +370,7 @@ def process_frame(frame, model, label_history=None):
 
 def main():
     parser = argparse.ArgumentParser(description="Target analysis pipeline")
-    parser.add_argument("--model",  default="best.pt",
+    parser.add_argument("--model",  default="target.pt",
                         help="Path to trained YOLO model (.pt)")
     parser.add_argument("--source", default="0",
                         help="Source: image/video path or camera index (default: 0)")
