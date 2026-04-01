@@ -225,7 +225,14 @@ def analyze_rings(roi_bgr):
     roi_center_x = w / 2.0
     roi_center_y = h / 2.0
     max_ref_r = max(1.0, min_dim / 2.0)
-    edge_margin = max(3, int(min_dim * 0.03))
+    def circle_clip_ratio(circle_x, circle_y, circle_r):
+        if circle_r <= 0:
+            return 1.0
+        left_out = max(0.0, float(circle_r - circle_x))
+        right_out = max(0.0, float(circle_x + circle_r - (w - 1)))
+        top_out = max(0.0, float(circle_r - circle_y))
+        bottom_out = max(0.0, float(circle_y + circle_r - (h - 1)))
+        return (left_out + right_out + top_out + bottom_out) / float(4.0 * circle_r)
 
     circles = cv2.HoughCircles(
         blurred,
@@ -233,7 +240,7 @@ def analyze_rings(roi_bgr):
         dp=1.2,
         minDist=min_dim // 2,          # only one circle is expected
         param1=60,
-        param2=30,
+        param2=26,
         minRadius=int(min_dim * 0.25),
         maxRadius=int(min_dim * 0.55),
     )
@@ -250,24 +257,13 @@ def analyze_rings(roi_bgr):
             if cand_r < 2:
                 continue
 
-            if (
-                cand_x - cand_r < edge_margin
-                or cand_y - cand_r < edge_margin
-                or cand_x + cand_r > (w - 1 - edge_margin)
-                or cand_y + cand_r > (h - 1 - edge_margin)
-            ):
+            clip_ratio = circle_clip_ratio(cand_x, cand_y, cand_r)
+            if clip_ratio > 0.45:
                 continue
 
             center_distance = np.hypot(cand_x - roi_center_x, cand_y - roi_center_y) / max_ref_r
             radius_score = cand_r / max_ref_r
-            border_clearance = min(
-                cand_x - cand_r,
-                cand_y - cand_r,
-                (w - 1) - (cand_x + cand_r),
-                (h - 1) - (cand_y + cand_r),
-            )
-            clearance_score = border_clearance / max(1.0, min_dim * 0.15)
-            score = (1.6 * radius_score) - (0.9 * center_distance) + (0.4 * clearance_score)
+            score = (1.7 * radius_score) - (0.85 * center_distance) - (1.2 * clip_ratio)
 
             if score > best_score:
                 best_score = score
@@ -292,18 +288,14 @@ def analyze_rings(roi_bgr):
             if cand_r < 2:
                 continue
 
-            if (
-                cand_x - cand_r < edge_margin
-                or cand_y - cand_r < edge_margin
-                or cand_x + cand_r > (w - 1 - edge_margin)
-                or cand_y + cand_r > (h - 1 - edge_margin)
-            ):
+            clip_ratio = circle_clip_ratio(cand_x, cand_y, cand_r)
+            if clip_ratio > 0.55:
                 continue
 
             fill_ratio = area / (np.pi * (cand_r ** 2) + 1e-6)
             center_distance = np.hypot(cand_x - roi_center_x, cand_y - roi_center_y) / max_ref_r
             radius_score = cand_r / max_ref_r
-            score = (1.4 * radius_score) - (0.8 * center_distance) + (0.6 * fill_ratio)
+            score = (1.35 * radius_score) - (0.75 * center_distance) + (0.45 * fill_ratio) - (0.8 * clip_ratio)
 
             if score > best_score:
                 best_score = score
