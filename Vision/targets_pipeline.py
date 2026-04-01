@@ -220,8 +220,13 @@ def analyze_rings(roi_bgr):
     ring_colors = ["Black"] * 5
     ring_values = [-2] * 5
 
-    # ── Detect outer circle using Hough ──────────────────────────────────────
+    # ── Detect outer circle using robust selection ───────────────────────────
     min_dim = min(h, w)
+    roi_center_x = w / 2.0
+    roi_center_y = h / 2.0
+    max_ref_r = max(1.0, min_dim / 2.0)
+    edge_margin = max(3, int(min_dim * 0.03))
+
     circles = cv2.HoughCircles(
         blurred,
         cv2.HOUGH_GRADIENT,
@@ -233,19 +238,86 @@ def analyze_rings(roi_bgr):
         maxRadius=int(min_dim * 0.55),
     )
 
-    if circles is None:
-        # Fallback: assume target fills the ROI
-        cx, cy = w // 2, h // 2
-        outer_r = min_dim // 2 - 2
-    else:
+    best_circle = None
+    best_score = -1e9
+
+    if circles is not None:
         candidates = np.round(circles[0]).astype(int)
-        largest_idx = int(np.argmax(candidates[:, 2]))
-        c = candidates[largest_idx]
-        cx, cy, outer_r = int(c[0]), int(c[1]), int(c[2])
+        for candidate in candidates:
+            cand_x = int(candidate[0])
+            cand_y = int(candidate[1])
+            cand_r = int(candidate[2])
+            if cand_r < 2:
+                continue
+
+            if (
+                cand_x - cand_r < edge_margin
+                or cand_y - cand_r < edge_margin
+                or cand_x + cand_r > (w - 1 - edge_margin)
+                or cand_y + cand_r > (h - 1 - edge_margin)
+            ):
+                continue
+
+            center_distance = np.hypot(cand_x - roi_center_x, cand_y - roi_center_y) / max_ref_r
+            radius_score = cand_r / max_ref_r
+            border_clearance = min(
+                cand_x - cand_r,
+                cand_y - cand_r,
+                (w - 1) - (cand_x + cand_r),
+                (h - 1) - (cand_y + cand_r),
+            )
+            clearance_score = border_clearance / max(1.0, min_dim * 0.15)
+            score = (1.6 * radius_score) - (0.9 * center_distance) + (0.4 * clearance_score)
+
+            if score > best_score:
+                best_score = score
+                best_circle = (cand_x, cand_y, cand_r)
+
+    if best_circle is None:
+        edges = cv2.Canny(blurred, 50, 150)
+        kernel = np.ones((3, 3), np.uint8)
+        edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel, iterations=1)
+        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        min_area = float(min_dim * min_dim) * 0.03
+
+        for contour in contours:
+            area = float(cv2.contourArea(contour))
+            if area < min_area:
+                continue
+
+            (cand_x_f, cand_y_f), cand_r_f = cv2.minEnclosingCircle(contour)
+            cand_x = int(round(cand_x_f))
+            cand_y = int(round(cand_y_f))
+            cand_r = int(round(cand_r_f))
+            if cand_r < 2:
+                continue
+
+            if (
+                cand_x - cand_r < edge_margin
+                or cand_y - cand_r < edge_margin
+                or cand_x + cand_r > (w - 1 - edge_margin)
+                or cand_y + cand_r > (h - 1 - edge_margin)
+            ):
+                continue
+
+            fill_ratio = area / (np.pi * (cand_r ** 2) + 1e-6)
+            center_distance = np.hypot(cand_x - roi_center_x, cand_y - roi_center_y) / max_ref_r
+            radius_score = cand_r / max_ref_r
+            score = (1.4 * radius_score) - (0.8 * center_distance) + (0.6 * fill_ratio)
+
+            if score > best_score:
+                best_score = score
+                best_circle = (cand_x, cand_y, cand_r)
+
+    if best_circle is None:
+        cx, cy = w // 2, h // 2
+        outer_r = int(min_dim * 0.48)
+    else:
+        cx, cy, outer_r = best_circle
 
     cx = int(np.clip(cx, 0, w - 1))
     cy = int(np.clip(cy, 0, h - 1))
-    outer_r = max(2, min(outer_r, min_dim // 2))
+    outer_r = max(2, min(outer_r, int(min_dim * 0.50)))
 
     # ── Split into 5 rings and classify each one ─────────────────────────────
     # Ring 1 = center (R1), Ring 5 = outer (R5)
