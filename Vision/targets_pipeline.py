@@ -27,7 +27,7 @@ def resolve_model_path(model_arg: str) -> Path:
     searched_paths = "\n".join(f"- {path}" for path in candidates)
     raise FileNotFoundError(
         "YOLO model (.pt) was not found.\n"
-        "Pass --model target.pt (if it is in weights) or a valid path.\n"
+        "Pass --model best.pt (if it is in weights) or a valid path.\n"
         f"Searched paths:\n{searched_paths}"
     )
 
@@ -295,14 +295,6 @@ def vote_label(label_history, new_label):
     return best_label
 
 
-def build_csi_gstreamer_pipeline(width=1280, height=720, fps=30):
-    return (
-        "libcamerasrc ! "
-        f"video/x-raw,width={int(width)},height={int(height)},framerate={int(fps)}/1 ! "
-        "videoconvert ! appsink drop=true max-buffers=1"
-    )
-
-
 def process_frame(frame, model, label_history=None):
     """
     Run the full pipeline on a BGR frame.
@@ -378,20 +370,10 @@ def process_frame(frame, model, label_history=None):
 
 def main():
     parser = argparse.ArgumentParser(description="Target analysis pipeline")
-    parser.add_argument("--model",  default="target.pt",
+    parser.add_argument("--model",  default="best.pt",
                         help="Path to trained YOLO model (.pt)")
     parser.add_argument("--source", default="0",
                         help="Source: image/video path or camera index (default: 0)")
-    parser.add_argument("--csi", action="store_true", default=False,
-                        help="Use Raspberry Pi CSI camera via libcamera/GStreamer")
-    parser.add_argument("--cam-width", type=int, default=1280,
-                        help="CSI camera capture width")
-    parser.add_argument("--cam-height", type=int, default=720,
-                        help="CSI camera capture height")
-    parser.add_argument("--cam-fps", type=int, default=30,
-                        help="CSI camera capture FPS")
-    parser.add_argument("--show",   action="store_true", default=True,
-                        help="Show real-time visualization window")
     parser.add_argument("--save",   default="",
                         help="Save output to this path (e.g., out.jpg or out.mp4)")
     args = parser.parse_args()
@@ -417,31 +399,17 @@ def main():
             cv2.imwrite(args.save, result)
             print(f" Saved to {args.save}")
 
-        if args.show:
-            cv2.imshow("Target Pipeline", result)
-            cv2.waitKey(0)
-            cv2.destroyAllWindows()
+        cv2.imshow("Target Pipeline", result)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
 
     else:
         # Video or camera
         source = int(args.source) if args.source.isdigit() else args.source
-        source_is_csi = args.csi or str(args.source).lower() == "csi"
-        if source_is_csi:
-            csi_pipeline = build_csi_gstreamer_pipeline(
-                width=args.cam_width,
-                height=args.cam_height,
-                fps=args.cam_fps,
-            )
-            cap = cv2.VideoCapture(csi_pipeline, cv2.CAP_GSTREAMER)
-        else:
-            cap = cv2.VideoCapture(source)
+        cap = cv2.VideoCapture(source)
 
         if not cap.isOpened():
-            if source_is_csi:
-                print("   Could not open CSI camera.")
-                print("   Check: libcamera installed, camera enabled, and GStreamer OpenCV support.")
-            else:
-                print(f"   Could not open source: {args.source}")
+            print(f"   Could not open source: {args.source}")
             return
 
         writer = None
@@ -463,10 +431,9 @@ def main():
 
             result = process_frame(frame, model, label_history=label_history)
 
-            if args.show:
-                cv2.imshow("Target Pipeline", result)
-                if cv2.waitKey(1) & 0xFF == ord('q'):
-                    break
+            cv2.imshow("Target Pipeline", result)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
 
             if writer:
                 writer.write(result)
