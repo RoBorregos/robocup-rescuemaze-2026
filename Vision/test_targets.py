@@ -17,9 +17,13 @@ import argparse
 import cv2
 import numpy as np
 import os
+import time
 from pathlib import Path
 from collections import deque
 from ultralytics import YOLO
+
+from detector import VisionDetector
+from protocol import CAM_LEFT, CAM_RIGHT
 
 EXPECTED_ORDER = ["green", "black", "red", "blue", "yellow"]
 N_RINGS = 5
@@ -405,12 +409,81 @@ def detect_bullseye(image_path, model=None, yolo_conf=0.4, label_history=None):
     return result
 
 
+def parse_camera_mode(source_text: str):
+    token = str(source_text).strip().lower()
+    if token in ("0", "right", "r"):
+        return [("RIGHT", CAM_RIGHT)]
+    if token in ("1", "left", "l"):
+        return [("LEFT", CAM_LEFT)]
+    if token in ("both", "all", "lr", "rl"):
+        return [("RIGHT", CAM_RIGHT), ("LEFT", CAM_LEFT)]
+    return None
+
+
+def run_camera_with_detector(camera_streams, model=None, yolo_conf=0.4, show=True):
+    detector = VisionDetector()
+    has_display = bool(os.environ.get("DISPLAY")) and show
+    histories = {name: deque(maxlen=TEMPORAL_VOTE_SIZE) for name, _ in camera_streams}
+
+    try:
+        if has_display:
+            print("[INFO] Camera preview active. Press Q to quit.")
+        else:
+            print("[HEADLESS] DISPLAY not found or --show disabled.")
+            print("[HEADLESS] Press Ctrl+C to stop.")
+
+        while True:
+            status_parts = []
+            for cam_name, cam_id in camera_streams:
+                ok, frame = detector.read_frame(cam_id)
+                if not ok or frame is None:
+                    status_parts.append(f"{cam_name}=NO_FRAME")
+                    if has_display:
+                        blank = np.full((480, 640, 3), 255, dtype=np.uint8)
+                        cv2.putText(
+                            blank,
+                            f"{cam_name}: camera read failed",
+                            (20, 35),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            0.8,
+                            (0, 0, 255),
+                            2,
+                        )
+                        cv2.imshow(f"Bullseye {cam_name}", blank)
+                    continue
+
+                result = detect_bullseye_frame(
+                    frame,
+                    model=model,
+                    yolo_conf=yolo_conf,
+                    label_history=histories[cam_name],
+                )
+                vis = frame if result is None else result["vis"]
+                label = "NONE" if result is None else result["stable_label"]
+                status_parts.append(f"{cam_name}={label}")
+
+                if has_display:
+                    cv2.imshow(f"Bullseye {cam_name}", vis)
+
+            if not has_display:
+                print("[HEADLESS] " + " | ".join(status_parts))
+                time.sleep(0.35)
+                continue
+
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord("q"):
+                break
+    finally:
+        detector.close()
+        cv2.destroyAllWindows()
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Bullseye detector with victim classification")
     parser.add_argument("image_path", nargs="?", default="",
                         help="Path to input image (optional if --source is used)")
     parser.add_argument("--source", default="",
-                        help="Source: image path, video path, or camera index (default: 0)")
+                        help="Source: image/video path, camera index, or left/right/both (default: 0)")
     parser.add_argument("--model", default="target.pt", help="YOLO model (.pt) path")
     parser.add_argument("--conf", type=float, default=0.4, help="YOLO confidence threshold")
     parser.add_argument("--no-yolo", action="store_true", help="Skip YOLO and analyze full image")
@@ -438,27 +511,37 @@ if __name__ == "__main__":
         detect_bullseye(input_source, model=yolo_model, yolo_conf=args.conf,
                         label_history=label_history)
     else:
-        source = int(input_source) if input_source.isdigit() else input_source
-        cap = cv2.VideoCapture(source)
-        if not cap.isOpened():
-            print(f"[ERROR] Could not open source: {input_source}")
-            raise SystemExit(1)
+        camera_mode = parse_camera_mode(input_source)
+        if camera_mode is not None:
+            run_camera_with_detector(
+                camera_mode,
+                model=yolo_model,
+                yolo_conf=args.conf,
+                show=args.show,
+            )
+            print("[INFO] Done.")
+        else:
+            source = int(input_source) if input_source.isdigit() else input_source
+            cap = cv2.VideoCapture(source)
+            if not cap.isOpened():
+                print(f"[ERROR] Could not open source: {input_source}")
+                raise SystemExit(1)
 
-        print("[INFO] Processing... press Q to quit.")
-        while True:
-            ok, frame = cap.read()
-            if not ok:
-                break
-
-            result = detect_bullseye_frame(frame, model=yolo_model, yolo_conf=args.conf,
-                                           label_history=label_history)
-            vis = frame if result is None else result["vis"]
-
-            if args.show:
-                cv2.imshow("Bullseye Detector", vis)
-                if cv2.waitKey(1) & 0xFF == ord('q'):
+            print("[INFO] Processing... press Q to quit.")
+            while True:
+                ok, frame = cap.read()
+                if not ok:
                     break
 
-        cap.release()
-        cv2.destroyAllWindows()
-        print("[INFO] Done.")
+                result = detect_bullseye_frame(frame, model=yolo_model, yolo_conf=args.conf,
+                                               label_history=label_history)
+                vis = frame if result is None else result["vis"]
+
+                if args.show:
+                    cv2.imshow("Bullseye Detector", vis)
+                    if cv2.waitKey(1) & 0xFF == ord('q'):
+                        break
+
+            cap.release()
+            cv2.destroyAllWindows()
+            print("[INFO] Done.")
