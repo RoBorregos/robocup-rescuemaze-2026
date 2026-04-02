@@ -7,7 +7,6 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 motors::motors() {}
 
 void motors::setupMotors() {
-  Serial.println("Begin");
   Wire.begin();
   delay(10);
   Wire.setClock(400000);
@@ -19,7 +18,7 @@ void motors::setupMotors() {
   setupVlx(vlxID::frontLeft);
   setupVlx(vlxID::back);
   setupTCS();
-  
+
   for (uint8_t i = 0; i < 4; i++) {
     motor[i].initialize(Pins::digitalOne[i], Pins::digitalTwo[i],
                         Pins::pwmPin[i], i);
