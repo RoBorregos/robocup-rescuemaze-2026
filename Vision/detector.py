@@ -46,6 +46,7 @@ class VisionDetector:
     def __init__(self) -> None:
         self.model_path = resolve_model_path()
         self.model = YOLO(str(self.model_path))
+        self._target_detector = None
         self.conf = getattr(Constants, "vision_conf_threshold", 0.45)
         self.imgsz = getattr(Constants, "vision_imgsz", 640)
         self.iou = getattr(Constants, "vision_iou_threshold", 0.50)
@@ -517,3 +518,18 @@ class VisionDetector:
 
         print(f"[VISION] top_class={best_class_name} conf={best_conf_global:.3f}")
         return self._class_to_victim_id(best_class_name)
+
+    def detect_target(self, camera_id: int):
+        """Detect a bullseye target using the same camera workflow."""
+        if self._target_detector is None:
+            from target_detector import TargetDetector
+
+            self._target_detector = TargetDetector()
+
+        ok, frame = self.read_frame(camera_id)
+        if not ok or frame is None:
+            cam_name = "RIGHT" if camera_id == CAM_RIGHT else "LEFT"
+            print(f"[VISION] no frame available for {cam_name} target detection")
+            return None
+
+        return self._target_detector.detect_frame(frame)

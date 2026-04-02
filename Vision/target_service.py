@@ -1,7 +1,7 @@
-"""UART service layer between Raspberry Pi vision and ESP32.
+"""UART service for bullseye target detection.
 
-Reads request packets, calls the detector, and sends response packets
-using the protocol helpers.
+The ESP keeps sending the same request packet; this service answers with
+explicit target IDs: UNHARMED, STABLE, HARMED, FAKE_TARGET, or NONE.
 """
 
 from __future__ import annotations
@@ -15,16 +15,25 @@ from serial.serialutil import SerialException
 import Constants
 from detector import VisionDetector
 from protocol import (
+    VICTIM_FAKE_TARGET,
+    VICTIM_HARMED,
+    VICTIM_STABLE,
+    VICTIM_UNHARMED,
+    build_fake_target_packet,
+    build_harmed_packet,
+    build_none_packet,
     PacketReader,
-    build_vision_packet,
+    build_stable_packet,
+    build_unharmed_packet,
     camera_name,
     parse_detection_request,
     rebuild_packet_bytes,
     victim_name,
 )
+from target_detector import TargetDetector
 
 
-class Esp32Service:
+class TargetEsp32Service:
     def __init__(
         self,
         port=Constants.serial_port,
@@ -36,7 +45,8 @@ class Esp32Service:
         self.timeout = timeout
         self.port: Optional[Serial] = None
         self.packet_reader = PacketReader()
-        self.detector = VisionDetector()
+        self.camera_detector = VisionDetector()
+        self.detector = TargetDetector()
 
     def connect(self) -> None:
         while True:
@@ -58,12 +68,21 @@ class Esp32Service:
     def close(self) -> None:
         if self.port is not None:
             self.port.close()
-        self.detector.close()
+        if self.camera_detector is not None:
+            self.camera_detector.close()
+        self.detector = None
 
     def send_vision_packet(self, camera_id: int, victim_id: int) -> int:
         if self.port is None:
             return 0
-        packet = build_vision_packet(camera_id, victim_id)
+        packet_builders = {
+            0: build_none_packet,
+            VICTIM_UNHARMED: build_unharmed_packet,
+            VICTIM_STABLE: build_stable_packet,
+            VICTIM_HARMED: build_harmed_packet,
+            VICTIM_FAKE_TARGET: build_fake_target_packet,
+        }
+        packet = packet_builders.get(victim_id, build_none_packet)(camera_id)
         written = self.port.write(packet)
         self.port.flush()
         print(f"[TX] {packet.hex(' ').upper()}")
@@ -73,10 +92,10 @@ class Esp32Service:
         if self.port is None:
             raise RuntimeError("Serial port not connected")
 
-        print("\n=== Vision System - YOLO Listener Mode ===")
+        print("\n=== Vision System - TARGET Listener Mode ===")
         print(f"Model: {self.detector.model_path.name}")
         print(
-            f"Cameras: RIGHT={self.detector.cam_right_idx}, LEFT={self.detector.cam_left_idx}"
+            "Sending UNHARMED/STABLE/HARMED/FAKE_TARGET (or NONE if unknown)"
         )
         print("Waiting for ESP detection requests... (Ctrl+C to exit)\n")
 
@@ -102,10 +121,24 @@ class Esp32Service:
                     print("[REQ] Ignored packet (not detection request)")
                     continue
 
-                victim_id = self.detector.detect_victim(camera_id)
+                result = self.detector.detect_camera_frame(self.camera_detector, camera_id)
+                victim_id = self.detector.victim_id_from_result(result)
                 self.send_vision_packet(camera_id, victim_id)
                 print(
                     f"[SENT] CAM={camera_name(camera_id)} VICTIM={victim_name(victim_id)}"
                 )
         except KeyboardInterrupt:
             print("\n[LISTENER] Stopped")
+
+
+def main() -> None:
+    service = TargetEsp32Service()
+    service.connect()
+    try:
+        service.listen_and_respond()
+    finally:
+        service.close()
+
+
+if __name__ == "__main__":
+    main()
