@@ -420,10 +420,85 @@ def parse_camera_mode(source_text: str):
     return None
 
 
-def run_camera_with_detector(camera_streams, model=None, yolo_conf=0.4, show=True):
-    detector = VisionDetector()
-    has_display = bool(os.environ.get("DISPLAY")) and show
+def open_direct_capture(index: int):
+    cap = cv2.VideoCapture(index, cv2.CAP_V4L2)
+    if not cap.isOpened():
+        cap.release()
+        cap = cv2.VideoCapture(index)
+    return cap
+
+
+def run_camera_direct(camera_streams, model=None, yolo_conf=0.4, show=True, show_raw=False):
+    has_display = bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")) and show
     histories = {name: deque(maxlen=TEMPORAL_VOTE_SIZE) for name, _ in camera_streams}
+    captures = {}
+    frame_size_logged = set()
+
+    for cam_name, cam_id in camera_streams:
+        cap = open_direct_capture(cam_id)
+        captures[cam_name] = cap
+        print(f"[INFO] DIRECT backend {cam_name} idx={cam_id} open={cap.isOpened()}")
+
+    try:
+        if has_display:
+            print("[INFO] Camera preview active (DIRECT). Press Q to quit.")
+        else:
+            print("[HEADLESS] DISPLAY/WAYLAND not found or --show disabled.")
+            print("[HEADLESS] Press Ctrl+C to stop.")
+
+        while True:
+            status_parts = []
+            for cam_name, _ in camera_streams:
+                cap = captures[cam_name]
+                ok, frame = cap.read()
+                if not ok or frame is None:
+                    status_parts.append(f"{cam_name}=NO_FRAME")
+                    if has_display:
+                        blank = np.full((480, 640, 3), 255, dtype=np.uint8)
+                        cv2.putText(blank, f"{cam_name}: camera read failed", (20, 35),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+                        cv2.imshow(f"Bullseye {cam_name}", blank)
+                    continue
+
+                if cam_name not in frame_size_logged:
+                    h, w = frame.shape[:2]
+                    print(f"[INFO] {cam_name} frame size: {w}x{h}")
+                    frame_size_logged.add(cam_name)
+
+                result = detect_bullseye_frame(
+                    frame,
+                    model=model,
+                    yolo_conf=yolo_conf,
+                    label_history=histories[cam_name],
+                )
+                vis = frame if result is None else result["vis"]
+                label = "NONE" if result is None else result["stable_label"]
+                status_parts.append(f"{cam_name}={label}")
+
+                if has_display:
+                    cv2.imshow(f"Bullseye {cam_name}", vis)
+                    if show_raw:
+                        cv2.imshow(f"RAW {cam_name}", frame)
+
+            if not has_display:
+                print("[HEADLESS] " + " | ".join(status_parts))
+                time.sleep(0.35)
+                continue
+
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord("q"):
+                break
+    finally:
+        for cap in captures.values():
+            cap.release()
+        cv2.destroyAllWindows()
+
+
+def run_camera_with_detector(camera_streams, model=None, yolo_conf=0.4, show=True, show_raw=False):
+    detector = VisionDetector()
+    has_display = bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")) and show
+    histories = {name: deque(maxlen=TEMPORAL_VOTE_SIZE) for name, _ in camera_streams}
+    frame_size_logged = set()
 
     try:
         if has_display:
@@ -452,6 +527,11 @@ def run_camera_with_detector(camera_streams, model=None, yolo_conf=0.4, show=Tru
                         cv2.imshow(f"Bullseye {cam_name}", blank)
                     continue
 
+                if cam_name not in frame_size_logged:
+                    h, w = frame.shape[:2]
+                    print(f"[INFO] {cam_name} frame size: {w}x{h}")
+                    frame_size_logged.add(cam_name)
+
                 result = detect_bullseye_frame(
                     frame,
                     model=model,
@@ -464,6 +544,8 @@ def run_camera_with_detector(camera_streams, model=None, yolo_conf=0.4, show=Tru
 
                 if has_display:
                     cv2.imshow(f"Bullseye {cam_name}", vis)
+                    if show_raw:
+                        cv2.imshow(f"RAW {cam_name}", frame)
 
             if not has_display:
                 print("[HEADLESS] " + " | ".join(status_parts))
@@ -487,6 +569,10 @@ if __name__ == "__main__":
     parser.add_argument("--model", default="target.pt", help="YOLO model (.pt) path")
     parser.add_argument("--conf", type=float, default=0.4, help="YOLO confidence threshold")
     parser.add_argument("--no-yolo", action="store_true", help="Skip YOLO and analyze full image")
+    parser.add_argument("--camera-backend", choices=["detector", "direct"], default="direct",
+                        help="Camera backend for left/right/both: detector or direct (default: direct)")
+    parser.add_argument("--show-raw", action="store_true",
+                        help="Show additional RAW full-frame window to verify no cropping")
     parser.add_argument("--show", action="store_true", default=True,
                         help="Show visualization window")
     args = parser.parse_args()
@@ -513,12 +599,22 @@ if __name__ == "__main__":
     else:
         camera_mode = parse_camera_mode(input_source)
         if camera_mode is not None:
-            run_camera_with_detector(
-                camera_mode,
-                model=yolo_model,
-                yolo_conf=args.conf,
-                show=args.show,
-            )
+            if args.camera_backend == "detector":
+                run_camera_with_detector(
+                    camera_mode,
+                    model=yolo_model,
+                    yolo_conf=args.conf,
+                    show=args.show,
+                    show_raw=args.show_raw,
+                )
+            else:
+                run_camera_direct(
+                    camera_mode,
+                    model=yolo_model,
+                    yolo_conf=args.conf,
+                    show=args.show,
+                    show_raw=args.show_raw,
+                )
             print("[INFO] Done.")
         else:
             source = int(input_source) if input_source.isdigit() else input_source
