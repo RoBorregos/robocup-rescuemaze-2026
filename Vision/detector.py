@@ -216,12 +216,25 @@ class VisionDetector:
             camera_count = 0
         print(f"[VISION] picamera2 available cameras={camera_count}")
 
-        if not right_ok and camera_count >= 1:
+        if camera_count <= 0:
+            print("[VISION] No Picamera2 cameras found")
+            return
+
+        # Prefer assigning CSI camera 0 to the side that failed in OpenCV.
+        # This helps mixed setups (USB + CSI) where only one Picamera2 camera exists.
+        if not right_ok:
             self.picam_right = self._init_picamera(0)
-        if not left_ok and camera_count >= 2:
-            self.picam_left = self._init_picamera(1)
-        elif not left_ok and camera_count < 2:
-            print("[VISION] LEFT picamera skipped: only one camera available")
+            right_ok = self.picam_right is not None
+
+        if not left_ok:
+            if camera_count >= 2:
+                self.picam_left = self._init_picamera(1)
+            elif self.picam_right is None:
+                self.picam_left = self._init_picamera(0)
+            else:
+                print(
+                    "[VISION] LEFT picamera skipped: single Picamera2 camera already used by RIGHT"
+                )
 
     def _can_read_once(self, cap: Optional[cv2.VideoCapture]) -> bool:
         if cap is None or not cap.isOpened():
@@ -295,12 +308,18 @@ class VisionDetector:
 
         if not self.cap_left.isOpened():
             self.cap_left.release()
-            if len(available) > 1:
-                self.cam_left_idx = available[1]
+            used_idx = self.cam_right_idx if self.cap_right.isOpened() else None
+            left_candidates = [idx for idx in available if idx != used_idx]
+            if left_candidates:
+                self.cam_left_idx = left_candidates[0]
+                self.cap_left = self._open_capture(self.cam_left_idx)
+                self._configure_capture(self.cap_left)
             else:
-                self.cam_left_idx = available[0]
-            self.cap_left = self._open_capture(self.cam_left_idx)
-            self._configure_capture(self.cap_left)
+                # Keep LEFT unopened so Picamera2 fallback can be assigned there.
+                self.cap_left = cv2.VideoCapture()
+                print(
+                    "[VISION] No distinct OpenCV index left for LEFT; waiting for Picamera2 fallback"
+                )
 
     def _open_capture(self, index: int) -> cv2.VideoCapture:
         cap = cv2.VideoCapture(index, cv2.CAP_V4L2)
