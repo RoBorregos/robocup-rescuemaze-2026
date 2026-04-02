@@ -7,7 +7,6 @@ maze m;
 
 void setup() {
   Serial.begin(115200);
-  delay(500);
   robot.setupMotors();
 
   robot.screenBegin();

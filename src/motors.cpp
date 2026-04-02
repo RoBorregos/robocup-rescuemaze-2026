@@ -8,7 +8,7 @@ motors::motors() {}
 
 void motors::setupMotors() {
   Serial.println("Begin");
-  Wire.begin(21, 22);
+  Wire.begin();
   delay(10);
   Wire.setClock(400000);
   // screenBegin();
