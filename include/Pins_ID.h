@@ -3,18 +3,18 @@
 #include <Arduino.h>
 
 namespace MotorID {
-constexpr uint8_t kBackRight = 0;
-constexpr uint8_t kBackLeft = 1;   // front left
-constexpr uint8_t kFrontRight = 2; // back left
-constexpr uint8_t kFrontLeft = 3;  // front right
+constexpr uint8_t kBackRight = 3;
+constexpr uint8_t kBackLeft = 2;   // front left
+constexpr uint8_t kFrontRight = 1; // back left
+constexpr uint8_t kFrontLeft = 0;  // front right
 } // namespace MotorID
 
 namespace Pins {
-constexpr uint8_t encoder[4] = {36, 39, 34, 35};
-constexpr uint8_t pwmPin[4] = {2, 5, 26, 32};
+constexpr uint8_t encoder[4] = {34, 35, 36, 39};
+constexpr uint8_t pwmPin[4] = {26, 32, 2, 5};
 
-constexpr uint8_t digitalOne[4] = {4, 17, 27, 25};
-constexpr uint8_t digitalTwo[4] = {15, 16, 14, 33};
+constexpr uint8_t digitalOne[4] = {27, 25, 4, 17};
+constexpr uint8_t digitalTwo[4] = {14, 33, 15, 16};
 constexpr uint8_t vlxPins[7] = { // MUX
     3, 4, 0, 2,
     5, // To define

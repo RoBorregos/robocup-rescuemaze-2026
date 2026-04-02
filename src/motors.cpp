@@ -7,15 +7,9 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 motors::motors() {}
 
 void motors::setupMotors() {
-  for (uint8_t i = 0; i < 4; i++) {
-    motor[i].initialize(Pins::digitalOne[i], Pins::digitalTwo[i],
-                        Pins::pwmPin[i], i);
-    myPID[i].changeConstants(kP_mov, kI_mov, kD_mov, movTime);
-  }
-
-  rampUpPID.changeConstants(kP_RampUp, kI_RampUp, kD_RampUp, rampTime);
-  rampDownPID.changeConstants(kP_RampDown, kI_RampDown, kD_RampDown, rampTime);
+  Serial.println("Begin");
   Wire.begin(21, 22);
+  delay(10);
   Wire.setClock(400000);
   // screenBegin();
   bno.setupBNO();
@@ -24,7 +18,15 @@ void motors::setupMotors() {
   setupVlx(vlxID::right);
   setupVlx(vlxID::frontLeft);
   setupVlx(vlxID::back);
-  // setupTCS();
+  setupTCS();
+  
+  for (uint8_t i = 0; i < 4; i++) {
+    motor[i].initialize(Pins::digitalOne[i], Pins::digitalTwo[i],
+                        Pins::pwmPin[i], i);
+    myPID[i].changeConstants(kP_mov, kI_mov, kD_mov, movTime);
+  }
+  rampUpPID.changeConstants(kP_RampUp, kI_RampUp, kD_RampUp, rampTime);
+  rampDownPID.changeConstants(kP_RampDown, kI_RampDown, kD_RampDown, rampTime);
 
   targetAngle = 0;
   delay(500);
