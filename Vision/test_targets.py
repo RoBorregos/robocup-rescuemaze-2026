@@ -424,6 +424,7 @@ def run_camera_with_detector(camera_streams, model=None, yolo_conf=0.4, show=Tru
     detector = VisionDetector()
     has_display = bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")) and show
     histories = {name: deque(maxlen=TEMPORAL_VOTE_SIZE) for name, _ in camera_streams}
+    frame_shape_logged = set()
 
     try:
         if has_display:
@@ -451,6 +452,11 @@ def run_camera_with_detector(camera_streams, model=None, yolo_conf=0.4, show=Tru
                         )
                         cv2.imshow(f"Bullseye {cam_name}", blank)
                     continue
+
+                if cam_name not in frame_shape_logged:
+                    frame_h, frame_w = frame.shape[:2]
+                    print(f"[INFO] {cam_name} frame shape={frame_w}x{frame_h}")
+                    frame_shape_logged.add(cam_name)
 
                 result = detect_bullseye_frame(
                     frame,
