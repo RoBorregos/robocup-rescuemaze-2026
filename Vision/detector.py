@@ -61,6 +61,11 @@ class VisionDetector:
         )
         self.frame_width = getattr(Constants, "vision_frame_width", 640)
         self.frame_height = getattr(Constants, "vision_frame_height", 480)
+        self.picamera_width = int(getattr(Constants, "vision_picamera_width", 1640))
+        self.picamera_height = int(getattr(Constants, "vision_picamera_height", 1232))
+        self.picamera_prefer_full_fov = bool(
+            getattr(Constants, "vision_picamera_prefer_full_fov", True)
+        )
 
         self.cam_right_idx = getattr(Constants, "camera_right_index", 0)
         self.cam_left_idx = getattr(Constants, "camera_left_index", 1)
@@ -86,6 +91,10 @@ class VisionDetector:
         print(
             f"[VISION] force_frame_size={self.force_frame_size} "
             f"target_size={self.frame_width}x{self.frame_height}"
+        )
+        print(
+            f"[VISION] picamera_prefer_full_fov={self.picamera_prefer_full_fov} "
+            f"picamera_size={self.picamera_width}x{self.picamera_height}"
         )
         print(
             f"[VISION] RIGHT idx={self.cam_right_idx} open={self.cap_right.isOpened()} | "
@@ -137,6 +146,10 @@ class VisionDetector:
             if self.force_frame_size:
                 config = picam.create_preview_configuration(
                     main={"size": (self.frame_width, self.frame_height)}
+                )
+            elif self.picamera_prefer_full_fov:
+                config = picam.create_preview_configuration(
+                    main={"size": (self.picamera_width, self.picamera_height)}
                 )
             else:
                 config = picam.create_preview_configuration()
@@ -195,10 +208,20 @@ class VisionDetector:
             "[VISION] Switching to Picamera2 backend for cameras that fail with OpenCV..."
         )
 
-        if not right_ok:
+        camera_count = 0
+        try:
+            Picamera2 = importlib.import_module("picamera2").Picamera2
+            camera_count = len(Picamera2.global_camera_info())
+        except Exception:
+            camera_count = 0
+        print(f"[VISION] picamera2 available cameras={camera_count}")
+
+        if not right_ok and camera_count >= 1:
             self.picam_right = self._init_picamera(0)
-        if not left_ok:
+        if not left_ok and camera_count >= 2:
             self.picam_left = self._init_picamera(1)
+        elif not left_ok and camera_count < 2:
+            print("[VISION] LEFT picamera skipped: only one camera available")
 
     def _can_read_once(self, cap: Optional[cv2.VideoCapture]) -> bool:
         if cap is None or not cap.isOpened():

@@ -21,6 +21,11 @@ vision_iou_threshold = 0.30
 vision_force_frame_size = False
 vision_frame_width = 640
 vision_frame_height = 480
+# Picamera2 preferred preview size when not forcing OpenCV size.
+# For IMX219, 1640x1232 usually preserves more FoV than 640x480.
+vision_picamera_width = 1640
+vision_picamera_height = 1232
+vision_picamera_prefer_full_fov = True
 vision_device = "cpu"
 vision_inference_frames = 1
 vision_inference_timeout_ms = 180
