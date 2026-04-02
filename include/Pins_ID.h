@@ -13,8 +13,8 @@ namespace Pins {
 constexpr uint8_t encoder[4] = {34, 35, 36, 39};
 constexpr uint8_t pwmPin[4] = {26, 32, 2, 5};
 
-constexpr uint8_t digitalOne[4] = {27, 25, 4, 17};
-constexpr uint8_t digitalTwo[4] = {14, 33, 15, 16};
+constexpr uint8_t digitalOne[4] = {14, 25, 15, 16};
+constexpr uint8_t digitalTwo[4] = {27, 33, 4, 17};
 constexpr uint8_t vlxPins[7] = { // MUX
     3, 4, 0, 2,
     5, // To define
