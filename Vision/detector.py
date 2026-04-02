@@ -66,6 +66,12 @@ class VisionDetector:
         self.picamera_prefer_full_fov = bool(
             getattr(Constants, "vision_picamera_prefer_full_fov", True)
         )
+        self.picamera_right_idx = int(
+            getattr(Constants, "vision_picamera_right_index", 0)
+        )
+        self.picamera_left_idx = int(
+            getattr(Constants, "vision_picamera_left_index", 1)
+        )
 
         self.cam_right_idx = getattr(Constants, "camera_right_index", 0)
         self.cam_left_idx = getattr(Constants, "camera_left_index", 1)
@@ -95,6 +101,10 @@ class VisionDetector:
         print(
             f"[VISION] picamera_prefer_full_fov={self.picamera_prefer_full_fov} "
             f"picamera_size={self.picamera_width}x{self.picamera_height}"
+        )
+        print(
+            f"[VISION] picamera_map RIGHT={self.picamera_right_idx} "
+            f"LEFT={self.picamera_left_idx}"
         )
         print(
             f"[VISION] RIGHT idx={self.cam_right_idx} open={self.cap_right.isOpened()} | "
@@ -193,6 +203,11 @@ class VisionDetector:
         right_ok = self._can_read_once(self.cap_right)
         left_ok = self._can_read_once(self.cap_left)
 
+        if not right_ok or not left_ok:
+            self._autodetect_readable_cameras()
+            right_ok = self._can_read_once(self.cap_right)
+            left_ok = self._can_read_once(self.cap_left)
+
         if right_ok and left_ok:
             return
 
@@ -209,32 +224,92 @@ class VisionDetector:
         )
 
         camera_count = 0
+        camera_info = []
         try:
             Picamera2 = importlib.import_module("picamera2").Picamera2
-            camera_count = len(Picamera2.global_camera_info())
+            camera_info = list(Picamera2.global_camera_info())
+            camera_count = len(camera_info)
         except Exception:
             camera_count = 0
         print(f"[VISION] picamera2 available cameras={camera_count}")
+        for idx, info in enumerate(camera_info):
+            model = info.get("Model", "unknown") if isinstance(info, dict) else str(info)
+            print(f"[VISION] picamera2[{idx}] model={model}")
 
         if camera_count <= 0:
             print("[VISION] No Picamera2 cameras found")
             return
 
+        preferred_right = self.picamera_right_idx
+        preferred_left = self.picamera_left_idx
+
+        if preferred_right < 0 or preferred_right >= camera_count:
+            preferred_right = 0
+        if preferred_left < 0 or preferred_left >= camera_count:
+            preferred_left = 1 if camera_count > 1 else 0
+
+        if preferred_left == preferred_right and camera_count > 1:
+            preferred_left = 1 if preferred_right == 0 else 0
+
         # Prefer assigning CSI camera 0 to the side that failed in OpenCV.
         # This helps mixed setups (USB + CSI) where only one Picamera2 camera exists.
         if not right_ok:
-            self.picam_right = self._init_picamera(0)
+            self.picam_right = self._init_picamera(preferred_right)
             right_ok = self.picam_right is not None
 
         if not left_ok:
             if camera_count >= 2:
-                self.picam_left = self._init_picamera(1)
+                self.picam_left = self._init_picamera(preferred_left)
             elif self.picam_right is None:
-                self.picam_left = self._init_picamera(0)
+                self.picam_left = self._init_picamera(preferred_left)
             else:
                 print(
                     "[VISION] LEFT picamera skipped: single Picamera2 camera already used by RIGHT"
                 )
+
+    def _autodetect_readable_cameras(self) -> None:
+        readable = []
+        for index in range(0, 8):
+            cap = self._open_capture(index)
+            if cap.isOpened():
+                ok, frame = cap.read()
+                if ok and frame is not None:
+                    readable.append(index)
+            cap.release()
+
+        if not readable:
+            print("[VISION] No readable OpenCV cameras found during re-scan")
+            return
+
+        right_ok = self._can_read_once(self.cap_right)
+        left_ok = self._can_read_once(self.cap_left)
+
+        if not right_ok:
+            new_right = readable[0]
+            if self.cap_right is not None:
+                self.cap_right.release()
+            self.cam_right_idx = new_right
+            self.cap_right = self._open_capture(self.cam_right_idx)
+            self._configure_capture(self.cap_right)
+            print(f"[VISION] RIGHT reassigned to readable OpenCV index={self.cam_right_idx}")
+
+        used_idx = self.cam_right_idx if self._can_read_once(self.cap_right) else None
+        left_candidates = [idx for idx in readable if idx != used_idx]
+
+        if not left_ok:
+            if left_candidates:
+                new_left = left_candidates[0]
+                if self.cap_left is not None:
+                    self.cap_left.release()
+                self.cam_left_idx = new_left
+                self.cap_left = self._open_capture(self.cam_left_idx)
+                self._configure_capture(self.cap_left)
+                print(f"[VISION] LEFT reassigned to readable OpenCV index={self.cam_left_idx}")
+            else:
+                if self.cap_left is not None:
+                    self.cap_left.release()
+                self.cap_left = cv2.VideoCapture()
+                print("[VISION] No second readable OpenCV camera for LEFT")
 
     def _can_read_once(self, cap: Optional[cv2.VideoCapture]) -> bool:
         if cap is None or not cap.isOpened():
