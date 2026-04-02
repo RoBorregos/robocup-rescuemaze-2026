@@ -56,6 +56,9 @@ class VisionDetector:
         self.inference_timeout_ms = int(
             getattr(Constants, "vision_inference_timeout_ms", 180)
         )
+        self.force_frame_size = bool(
+            getattr(Constants, "vision_force_frame_size", False)
+        )
         self.frame_width = getattr(Constants, "vision_frame_width", 640)
         self.frame_height = getattr(Constants, "vision_frame_height", 480)
 
@@ -81,6 +84,10 @@ class VisionDetector:
             f"imgsz={self.imgsz} device={self.device} frames={self.inference_frames}"
         )
         print(
+            f"[VISION] force_frame_size={self.force_frame_size} "
+            f"target_size={self.frame_width}x{self.frame_height}"
+        )
+        print(
             f"[VISION] RIGHT idx={self.cam_right_idx} open={self.cap_right.isOpened()} | "
             f"LEFT idx={self.cam_left_idx} open={self.cap_left.isOpened()}"
         )
@@ -99,9 +106,12 @@ class VisionDetector:
             return None
         try:
             picam = Picamera2(camera_num)
-            config = picam.create_preview_configuration(
-                main={"size": (self.frame_width, self.frame_height)}
-            )
+            if self.force_frame_size:
+                config = picam.create_preview_configuration(
+                    main={"size": (self.frame_width, self.frame_height)}
+                )
+            else:
+                config = picam.create_preview_configuration()
             picam.configure(config)
             self._apply_autofocus_controls(picam)
             picam.start()
@@ -236,7 +246,7 @@ class VisionDetector:
         return cap
 
     def _configure_capture(self, cap: cv2.VideoCapture) -> None:
-        if cap is None:
+        if cap is None or not self.force_frame_size:
             return
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.frame_width)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.frame_height)

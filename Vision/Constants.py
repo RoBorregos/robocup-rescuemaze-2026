@@ -16,6 +16,9 @@ timeout = 0.5
 vision_conf_threshold = 0.25
 vision_imgsz = 640
 vision_iou_threshold = 0.30
+# If True, force camera output size to vision_frame_width/height.
+# If False, keep camera native/default mode (recommended for fisheye to avoid crop).
+vision_force_frame_size = False
 vision_frame_width = 640
 vision_frame_height = 480
 vision_device = "cpu"
