@@ -16,6 +16,7 @@ from typing import Optional
 os.environ.setdefault("OPENCV_VIDEOIO_PRIORITY_OBSENSOR", "0")
 
 import cv2
+import numpy as np
 from ultralytics import YOLO
 
 import Constants
@@ -88,6 +89,16 @@ class VisionDetector:
         self.picamera_tuning_file = str(
             getattr(Constants, "vision_picamera_tuning_file", "")
         ).strip()
+        self.right_gain_b = float(getattr(Constants, "vision_right_gain_b", 1.0))
+        self.right_gain_g = float(getattr(Constants, "vision_right_gain_g", 1.0))
+        self.right_gain_r = float(getattr(Constants, "vision_right_gain_r", 1.0))
+        self.left_gain_b = float(getattr(Constants, "vision_left_gain_b", 1.0))
+        self.left_gain_g = float(getattr(Constants, "vision_left_gain_g", 1.0))
+        self.left_gain_r = float(getattr(Constants, "vision_left_gain_r", 1.0))
+        self.right_hue_shift = float(getattr(Constants, "vision_right_hue_shift", 0.0))
+        self.left_hue_shift = float(getattr(Constants, "vision_left_hue_shift", 0.0))
+        self.right_sat_scale = float(getattr(Constants, "vision_right_saturation_scale", 1.0))
+        self.left_sat_scale = float(getattr(Constants, "vision_left_saturation_scale", 1.0))
         self.picamera_right_idx = int(
             getattr(Constants, "vision_picamera_right_index", 0)
         )
@@ -169,6 +180,14 @@ class VisionDetector:
         )
         print(f"[VISION] picamera_color_order={self.picamera_color_order}")
         print(f"[VISION] picamera_tuning_file={self.picamera_tuning_file or 'default'}")
+        print(
+            f"[VISION] right_color gain(B,G,R)=({self.right_gain_b:.2f},{self.right_gain_g:.2f},{self.right_gain_r:.2f}) "
+            f"hue_shift={self.right_hue_shift:.2f} sat_scale={self.right_sat_scale:.2f}"
+        )
+        print(
+            f"[VISION] left_color gain(B,G,R)=({self.left_gain_b:.2f},{self.left_gain_g:.2f},{self.left_gain_r:.2f}) "
+            f"hue_shift={self.left_hue_shift:.2f} sat_scale={self.left_sat_scale:.2f}"
+        )
         print(
             f"[VISION] picamera_size_by_cam RIGHT={self.picamera_right_width}x{self.picamera_right_height} "
             f"LEFT={self.picamera_left_width}x{self.picamera_left_height}"
@@ -275,6 +294,60 @@ class VisionDetector:
                     return cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
                 return cv2.cvtColor(frame, cv2.COLOR_RGBA2BGR)
         return frame
+
+    @staticmethod
+    def _apply_channel_gains(frame_bgr, gain_b: float, gain_g: float, gain_r: float):
+        if (
+            abs(gain_b - 1.0) < 1e-6
+            and abs(gain_g - 1.0) < 1e-6
+            and abs(gain_r - 1.0) < 1e-6
+        ):
+            return frame_bgr
+
+        frame_float = frame_bgr.astype(np.float32)
+        frame_float[..., 0] *= gain_b
+        frame_float[..., 1] *= gain_g
+        frame_float[..., 2] *= gain_r
+        np.clip(frame_float, 0, 255, out=frame_float)
+        return frame_float.astype(np.uint8)
+
+    @staticmethod
+    def _apply_hsv_tuning(frame_bgr, hue_shift: float, saturation_scale: float):
+        if abs(hue_shift) < 1e-6 and abs(saturation_scale - 1.0) < 1e-6:
+            return frame_bgr
+
+        hsv = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2HSV).astype(np.float32)
+        hsv[..., 0] = (hsv[..., 0] + hue_shift) % 180.0
+        hsv[..., 1] *= saturation_scale
+        np.clip(hsv[..., 1], 0, 255, out=hsv[..., 1])
+        hsv_u8 = hsv.astype(np.uint8)
+        return cv2.cvtColor(hsv_u8, cv2.COLOR_HSV2BGR)
+
+    def _apply_color_correction(self, frame_bgr, camera_id: int):
+        if camera_id == CAM_RIGHT:
+            corrected = self._apply_channel_gains(
+                frame_bgr,
+                self.right_gain_b,
+                self.right_gain_g,
+                self.right_gain_r,
+            )
+            return self._apply_hsv_tuning(
+                corrected,
+                self.right_hue_shift,
+                self.right_sat_scale,
+            )
+
+        corrected = self._apply_channel_gains(
+            frame_bgr,
+            self.left_gain_b,
+            self.left_gain_g,
+            self.left_gain_r,
+        )
+        return self._apply_hsv_tuning(
+            corrected,
+            self.left_hue_shift,
+            self.left_sat_scale,
+        )
 
     def _apply_autofocus_controls(self, picam) -> None:
         mode_name = (
@@ -536,7 +609,7 @@ class VisionDetector:
                 if frame is not None:
                     frame_bgr = self._to_bgr(frame)
                     if frame_bgr is not None:
-                        return True, frame_bgr
+                        return True, self._apply_color_correction(frame_bgr, CAM_RIGHT)
             except Exception:
                 pass
             if self.block_opencv_right:
@@ -551,7 +624,7 @@ class VisionDetector:
                 if frame is not None:
                     frame_bgr = self._to_bgr(frame)
                     if frame_bgr is not None:
-                        return True, frame_bgr
+                        return True, self._apply_color_correction(frame_bgr, CAM_LEFT)
             except Exception:
                 pass
         if self.block_opencv_left:

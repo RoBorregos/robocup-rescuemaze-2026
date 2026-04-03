@@ -42,6 +42,19 @@ vision_picamera_color_order = "BGR"
 # Optional Picamera2 tuning file. Use the same one that works with rpicam-hello.
 # Example IMX219 noir tuning:
 vision_picamera_tuning_file = "/usr/share/libcamera/ipa/rpi/pisp/imx219_noir.json"
+# Per-camera color correction before inference (BGR channel gains + HSV tuning).
+# RIGHT camera (0): slight green reduction + red boost to separate yellow from green.
+vision_right_gain_b = 1.00
+vision_right_gain_g = 0.92
+vision_right_gain_r = 1.06
+vision_right_hue_shift = -2.0
+vision_right_saturation_scale = 1.10
+# LEFT camera (1): neutral defaults.
+vision_left_gain_b = 1.00
+vision_left_gain_g = 1.00
+vision_left_gain_r = 1.00
+vision_left_hue_shift = 0.0
+vision_left_saturation_scale = 1.00
 # Explicit Picamera2 camera mapping for CSI setups.
 # Typical default: RIGHT=0, LEFT=1 (adjust if physically swapped).
 vision_picamera_right_index = 0
