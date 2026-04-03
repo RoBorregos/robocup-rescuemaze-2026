@@ -51,11 +51,7 @@ void motors::PID_Wheel(int targetSpeed, int i) {
   int speed_setpoint = targetSpeed;
   int reference_pwm;
   reference_pwm = motor[i].getSpeed();
-  Serial.println("reference_pwm");
-  Serial.println(reference_pwm);
   int speedTics = motor[i].getTicsSpeed();
-  Serial.println("speedTics");
-  Serial.println(speedTics);
   float error = myPID[i].calculate_PID(speed_setpoint, speedTics);
   int speed = reference_pwm + error;
   speed = constrain(speed, 0, 255);
@@ -75,13 +71,11 @@ void motors::pidEncoders(int speedReference, bool ahead) {
   float AngleError = pidBno.calculate_PID(
       targetAngle + changeAngle, (targetAngle == 0 ? z_rotation : angle));
   AngleError = constrain(AngleError, -17, 17);
-  // Serial.println(AngleError);
-  Serial.println(AngleError);
   if (!ahead)
     AngleError = -AngleError;
   PID_Wheel(speedReference + AngleError, MotorID::kFrontLeft);
   PID_Wheel(speedReference + AngleError, MotorID::kBackLeft);
-  PID_Wheel(speedReference - AngleError, MotorID::kFrontRight);
+  PID_Wheel(speedReference + 5 - AngleError, MotorID::kFrontRight);
   PID_Wheel(speedReference - AngleError, MotorID::kBackRight);
 }
 
@@ -94,6 +88,7 @@ void motors::ahead() {
   int offset = 0;
   ;
   float distance;
+  float targetAngle_ = targetAngle;
   bool encoder, frontVlx;
   bool rampCaution = false;
   float frontDistance = max(vlx[vlxID::frontLeft].getDistance(),
@@ -181,6 +176,25 @@ void motors::ahead() {
   }
   slope = false;
   stop();
+  float angle = bno.getOrientationX();
+  if (abs(targetAngle_ - angle) >= 10) {
+    rotate(targetAngle_);
+  }
+  if (!encoder) {
+    if ((vlx[vlxID::left].isWall()) && vlx[vlxID::right].isWall()) {
+      (vlx[vlxID::right].getDistance() <= vlx[vlxID::left].getDistance())
+          ? (setright())
+          : (setleft());
+      float error = rampUpPID.calculate_PID(
+          0, (vlx[vlxID::right].distance - vlx[vlxID::left].distance));
+      error = constrain(error, -17, 17);
+      PID_Wheel(-error, MotorID::kFrontLeft);
+      PID_Wheel(-error, MotorID::kBackLeft);
+      PID_Wheel(error + 5, MotorID::kFrontRight);
+      PID_Wheel(error, MotorID::kBackRight);
+    }
+  }
+  stop();
   resetTics();
   // checkTileColor();
 }
@@ -233,9 +247,6 @@ float motors::nearWall() {
 void motors::passObstacle() {
   float targetAngle_ = targetAngle;
   float sideAngle = targetAngle_;
-  float angle = bno.getOrientationX();
-  if (abs(targetAngle_ - angle) >= 2)
-    rotate(targetAngle_);
   bool leftBlocked = vlx[vlxID::frontLeft].getDistance() < kDistanceToObstacle;
   bool rightBlocked =
       vlx[vlxID::frontRight].getDistance() < kDistanceToObstacle;
@@ -245,7 +256,9 @@ void motors::passObstacle() {
   if (leftBlocked && rightBlocked)
     return; // Completely blocked, can't pass
 
-  moveDistance(kTileLength / 5, false);
+  if (vlx[vlxID::back].getDistance() > 20) {
+    moveDistance(kTileLength / 5, false);
+  }
   limitColition = true;
   if (leftBlocked || rightBlocked) {
     float sideAngle = targetAngle + (leftBlocked ? 25 : -25);
@@ -391,10 +404,16 @@ float motors::changeSpeedMove(bool encoders, bool rotate, int targetDistance,
   float speed;
   float missingDistance, missingAngle;
   if (rotate == true) {
+    if (limitColition) {
+      kMinSpeedRotate = 10;
+    }
     missingAngle = abs(targetAngle - (targetAngle == 0 ? z_rotation : angle));
     speed = map(missingAngle, 90, 0, kMaxSpeedRotate, kMinSpeedRotate);
     speed = constrain(speed, kMinSpeedRotate, kMaxSpeedRotate);
-    PID_AllWheels(speed);
+    PID_Wheel(speed, MotorID::kFrontLeft);
+    PID_Wheel(speed, MotorID::kBackLeft);
+    PID_Wheel(speed + 5, MotorID::kFrontRight);
+    PID_Wheel(speed, MotorID::kBackRight);
     return 0;
   } else {
     if (encoders == true) {
@@ -574,9 +593,9 @@ bool motors::isWall(uint8_t direction) {
   uint8_t realPos = rulet[relativeDir][direction];
   bool frontLeft = vlx[vlxID::frontLeft].isWall();
   bool frontRight = vlx[vlxID::frontRight].isWall();
-  bool right = vlx[vlxID::right].isWall();
+  bool right = vlx[vlxID::right].getDistance() < 20;
   bool back = vlx[vlxID::back].isWall();
-  bool left = vlx[vlxID::left].isWall();
+  bool left = vlx[vlxID::left].getDistance() < 20;
 
   switch (realPos) {
   case 0:

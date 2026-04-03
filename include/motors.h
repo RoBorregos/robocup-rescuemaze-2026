@@ -19,7 +19,7 @@
 #define PCA9548A_ADDR 0x70      // PCA9548A Direction
 #define PCA9548A_CHANNEL_4 0x20 // Canal 4 (SDA4/SCL4)
 
-constexpr uint8_t edgeTileDistance = 10;
+constexpr uint8_t edgeTileDistance = 8;
 constexpr uint8_t kTileLength = 30;
 constexpr uint8_t rulet[4][4] = {
     {0, 1, 2, 3}, {3, 0, 1, 2}, {2, 3, 0, 1}, {1, 2, 3, 0}};
@@ -38,8 +38,7 @@ private:
   static constexpr uint8_t maxVlxDistance = 68;
   static constexpr uint8_t brakingDis = 5;
   static constexpr uint8_t kDistanceToWall = 12;
-  static constexpr uint8_t kDistanceToObstacle =
-      kTileLength + 2; // look over a bit more than a tile
+  static constexpr uint8_t kDistanceToObstacle = 20;
   // wheels
   static constexpr float wheelDiameter = 7.5;
   static constexpr float distancePerRev = wheelDiameter * PI;
@@ -51,10 +50,10 @@ private:
   uint16_t kMinPwmFormard = 70;
   uint16_t kMaxPwmFormard = 180;
   // Speeds constants
-  static constexpr uint16_t kMinSpeedRotate = 7;
+  uint16_t kMinSpeedRotate = 5;
   static constexpr uint16_t kMaxSpeedRotate = 30;
   static constexpr uint16_t kMinSpeedFormard = 5;
-  static constexpr uint16_t kMaxSpeedFormard = 40;
+  static constexpr uint16_t kMaxSpeedFormard = 50;
   static constexpr uint16_t kSpeedRampUp = 20;
   static constexpr uint16_t kSpeedRampDown = 9;
   // ramp
