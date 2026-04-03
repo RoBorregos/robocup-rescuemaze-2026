@@ -101,6 +101,14 @@ def _get_geom_setting(camera_id: int | None, name: str, default):
     return getattr(Constants, f"target_{name}", default)
 
 
+def _is_verbose(camera_id: int | None) -> bool:
+    return bool(_get_geom_setting(camera_id, "verbose", False))
+
+
+def _is_fast_mode(camera_id: int | None) -> bool:
+    return bool(_get_geom_setting(camera_id, "fast_mode", True))
+
+
 def detect_target_roi_with_yolo(
     img,
     model,
@@ -184,6 +192,7 @@ def find_largest_circle(
     min_circularity: float = 0.50,
     contour_min_area: float = 500.0,
     border_allow_ratio: float = 0.0,
+    fast_mode: bool = False,
 ):
     """Find the biggest circle via Hough sweep + contour fallback."""
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -193,10 +202,19 @@ def find_largest_circle(
     min_r = int(min(h_img, w_img) * float(min_radius_ratio))
     border_allow = int(min(h_img, w_img) * float(border_allow_ratio))
 
+    if fast_mode:
+        dp_values = [1.0, 1.4]
+        p1_values = [60, 100]
+        p2_values = [24, 36, 50]
+    else:
+        dp_values = [1.0, 1.2, 1.5, 1.8]
+        p1_values = [50, 80, 120]
+        p2_values = [22, 30, 40, 50, 70]
+
     best = None
-    for dp in [1.0, 1.2, 1.5, 1.8]:
-        for p1 in [50, 80, 120]:
-            for p2 in [22, 30, 40, 50, 70]:
+    for dp in dp_values:
+        for p1 in p1_values:
+            for p2 in p2_values:
                 circles = cv2.HoughCircles(
                     blurred,
                     cv2.HOUGH_GRADIENT,
@@ -216,6 +234,12 @@ def find_largest_circle(
                             continue
                         if best is None or cr > best[2]:
                             best = (ccx, ccy, cr)
+                if fast_mode and best is not None:
+                    break
+            if fast_mode and best is not None:
+                break
+        if fast_mode and best is not None:
+            break
 
     edges = cv2.Canny(blurred, 30, 100)
     edges = cv2.dilate(edges, None, iterations=1)
@@ -247,11 +271,20 @@ def find_largest_circle(
     return best
 
 
-def classify_ring(hsv, cx, cy, r_inner, r_outer, n_angles: int = 90):
+def classify_ring(
+    hsv,
+    cx,
+    cy,
+    r_inner,
+    r_outer,
+    n_angles: int = 90,
+    min_radial_samples: int = 5,
+    radial_divisor: int = 2,
+):
     """Classify a ring region by HSV majority vote on sampled pixels."""
     h_img, w_img = hsv.shape[:2]
     angles = np.linspace(0, 2 * np.pi, n_angles, endpoint=False)
-    n_radial = max(5, (r_outer - r_inner) // 2)
+    n_radial = max(int(min_radial_samples), (r_outer - r_inner) // max(1, int(radial_divisor)))
     radii = np.linspace(r_inner, r_outer, n_radial, endpoint=False)
 
     votes = {}
@@ -314,12 +347,14 @@ def detect_bullseye_frame(
             force_square=roi_force_square,
         )
         if yolo_result is None:
-            print("[WARN] YOLO did not find a valid target box")
+            if _is_verbose(camera_id):
+                print("[WARN] YOLO did not find a valid target box")
             return None
         bbox = yolo_result["bbox"]
         yolo_score = yolo_result["conf"]
         img = yolo_result["roi"]
-        print(f"[INFO] YOLO bbox={bbox} conf={yolo_score:.2f}")
+        if _is_verbose(camera_id):
+            print(f"[INFO] YOLO bbox={bbox} conf={yolo_score:.2f}")
 
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     h_img, w_img = img.shape[:2]
@@ -330,22 +365,38 @@ def detect_bullseye_frame(
         min_circularity=float(_get_geom_setting(camera_id, "circle_min_circularity", 0.50)),
         contour_min_area=float(_get_geom_setting(camera_id, "circle_contour_min_area", 500.0)),
         border_allow_ratio=float(_get_geom_setting(camera_id, "circle_border_allow_ratio", 0.0)),
+        fast_mode=_is_fast_mode(camera_id),
     )
     if result is None:
-        print("[INFO] No valid target found (no circle fully inside the image)")
+        if _is_verbose(camera_id):
+            print("[INFO] No valid target found (no circle fully inside the image)")
         return None
     cx, cy, outer_r = result
-    print(f"[INFO] Main circle -> center=({cx},{cy}) radius={outer_r}")
+    if _is_verbose(camera_id):
+        print(f"[INFO] Main circle -> center=({cx},{cy}) radius={outer_r}")
 
     Y, X = np.ogrid[:h_img, :w_img]
     dist = np.sqrt((X - cx) ** 2 + (Y - cy) ** 2).astype(np.float32)
 
     ring_data = []
+    ring_n_angles = int(_get_geom_setting(camera_id, "ring_n_angles", 90))
+    ring_min_radial = int(_get_geom_setting(camera_id, "ring_min_radial_samples", 5))
+    ring_radial_divisor = int(_get_geom_setting(camera_id, "ring_radial_divisor", 2))
+
     for i in range(N_RINGS):
         r_outer = int(outer_r * (N_RINGS - i) / N_RINGS)
         r_inner = int(outer_r * (N_RINGS - i - 1) / N_RINGS)
 
-        color = classify_ring(hsv, cx, cy, r_inner, r_outer)
+        color = classify_ring(
+            hsv,
+            cx,
+            cy,
+            r_inner,
+            r_outer,
+            n_angles=ring_n_angles,
+            min_radial_samples=ring_min_radial,
+            radial_divisor=ring_radial_divisor,
+        )
 
         mask = ((dist >= r_inner) & (dist < r_outer)).astype(np.uint8)
         bgr_px = img[mask == 1]
@@ -371,30 +422,31 @@ def detect_bullseye_frame(
     if label_history is not None:
         stable_label = vote_label(label_history, victim_label)
 
-    print()
-    print("=" * 70)
-    print("  BULLSEYE ANALYSIS (outside -> inside)")
-    print("=" * 70)
-    for d in ring_data:
-        r, g, b = d["avg_rgb"]
-        h, s, v = d["avg_hsv"]
-        exp = EXPECTED_ORDER[d["ring"]]
-        ok = "OK" if d["color"] == exp else "FAIL"
-        val = COLOR_VALUE.get(d["color"], 0)
-        print(
-            f"  Ring {d['ring']} | {d['color']:>8s} (exp: {exp:>7s}) [{ok:>4s}] "
-            f"val={val:+d} | RGB=({r:3d},{g:3d},{b:3d}) | HSV=({h:3d},{s:3d},{v:3d}) | "
-            f"r=[{d['r_inner']:3d},{d['r_outer']:3d}]"
-        )
+    if _is_verbose(camera_id):
+        print()
+        print("=" * 70)
+        print("  BULLSEYE ANALYSIS (outside -> inside)")
+        print("=" * 70)
+        for d in ring_data:
+            r, g, b = d["avg_rgb"]
+            h, s, v = d["avg_hsv"]
+            exp = EXPECTED_ORDER[d["ring"]]
+            ok = "OK" if d["color"] == exp else "FAIL"
+            val = COLOR_VALUE.get(d["color"], 0)
+            print(
+                f"  Ring {d['ring']} | {d['color']:>8s} (exp: {exp:>7s}) [{ok:>4s}] "
+                f"val={val:+d} | RGB=({r:3d},{g:3d},{b:3d}) | HSV=({h:3d},{s:3d},{v:3d}) | "
+                f"r=[{d['r_inner']:3d},{d['r_outer']:3d}]"
+            )
 
-    print(f"\n  Detected : {detected}")
-    print(f"  Expected : {EXPECTED_ORDER}")
-    print(f"  Ring sum : {ring_sum}  →  raw={victim_label}  stable={stable_label}")
-    print(
-        f"\n  {'[OK] VALID TARGET' if victim_label != 'Fake_target' else '[!!] FAKE TARGET'}"
-        f"  —  {stable_label}"
-    )
-    print("=" * 70)
+        print(f"\n  Detected : {detected}")
+        print(f"  Expected : {EXPECTED_ORDER}")
+        print(f"  Ring sum : {ring_sum}  →  raw={victim_label}  stable={stable_label}")
+        print(
+            f"\n  {'[OK] VALID TARGET' if victim_label != 'Fake_target' else '[!!] FAKE TARGET'}"
+            f"  —  {stable_label}"
+        )
+        print("=" * 70)
 
     vis = orig.copy()
     color_draw = {

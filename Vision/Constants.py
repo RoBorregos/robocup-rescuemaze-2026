@@ -39,16 +39,15 @@ vision_picamera_main_format = "RGB888"
 # Color order returned by Picamera2 frames before CV processing.
 # Use "BGR" if image looks blue-tinted, "RGB" if colors look correct already.
 vision_picamera_color_order = "BGR"
-# Optional Picamera2 tuning file. Use the same one that works with rpicam-hello.
-# Example IMX219 noir tuning:
-vision_picamera_tuning_file = "/usr/share/libcamera/ipa/rpi/pisp/imx219_noir.json"
+# Optional Picamera2 tuning file. Leave empty to use sensor default tuning.
+vision_picamera_tuning_file = ""
 # Per-camera color correction before inference (BGR channel gains + HSV tuning).
-# RIGHT camera (0): slight green reduction + red boost to separate yellow from green.
+# RIGHT camera (0): neutral defaults to avoid pink/magenta cast.
 vision_right_gain_b = 1.00
-vision_right_gain_g = 0.92
-vision_right_gain_r = 1.06
-vision_right_hue_shift = -2.0
-vision_right_saturation_scale = 1.10
+vision_right_gain_g = 1.00
+vision_right_gain_r = 1.00
+vision_right_hue_shift = 0.0
+vision_right_saturation_scale = 1.00
 # LEFT camera (1): neutral defaults.
 vision_left_gain_b = 1.00
 vision_left_gain_g = 1.00
@@ -58,6 +57,8 @@ vision_left_saturation_scale = 1.00
 
 # Bullseye geometry tuning (ROI + circle permissiveness for fisheye lenses).
 # Global defaults:
+target_fast_mode = True
+target_verbose = False
 target_roi_pad_ratio = 0.10
 target_roi_min_pad = 8
 target_roi_force_square = True
@@ -65,11 +66,15 @@ target_circle_min_radius_ratio = 0.10
 target_circle_min_circularity = 0.30
 target_circle_contour_min_area = 250.0
 target_circle_border_allow_ratio = 0.08
+target_ring_n_angles = 56
+target_ring_min_radial_samples = 4
+target_ring_radial_divisor = 3
 
 # RIGHT camera (0) override: a bit more permissive.
 target_right_roi_pad_ratio = 0.15
 target_right_circle_min_circularity = 0.24
 target_right_circle_border_allow_ratio = 0.14
+target_right_ring_n_angles = 48
 # Explicit Picamera2 camera mapping for CSI setups.
 # Typical default: RIGHT=0, LEFT=1 (adjust if physically swapped).
 vision_picamera_right_index = 0
