@@ -26,15 +26,18 @@ vision_frame_height = 480
 vision_picamera_width = 1640
 vision_picamera_height = 1232
 # Per-camera override (useful with mixed sensors like IMX219 + IMX708).
-# RIGHT (example IMX219 fisheye): 4:3
-vision_picamera_right_width = 1640
-vision_picamera_right_height = 1232
+# RIGHT (example IMX219 fisheye): 1280x720 worked better in field tests.
+vision_picamera_right_width = 1280
+vision_picamera_right_height = 720
 # LEFT (example IMX708): 16:9
 vision_picamera_left_width = 2304
 vision_picamera_left_height = 1296
 vision_picamera_prefer_full_fov = True
 # Preferred Picamera2 main stream format (RGB888 recommended for CV pipeline).
 vision_picamera_main_format = "RGB888"
+# Color order returned by Picamera2 frames before CV processing.
+# Use "BGR" if image looks blue-tinted, "RGB" if colors look correct already.
+vision_picamera_color_order = "BGR"
 # Explicit Picamera2 camera mapping for CSI setups.
 # Typical default: RIGHT=0, LEFT=1 (adjust if physically swapped).
 vision_picamera_right_index = 0

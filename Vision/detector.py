@@ -82,6 +82,9 @@ class VisionDetector:
         self.picamera_main_format = str(
             getattr(Constants, "vision_picamera_main_format", "RGB888")
         )
+        self.picamera_color_order = str(
+            getattr(Constants, "vision_picamera_color_order", "BGR")
+        ).strip().upper()
         self.picamera_right_idx = int(
             getattr(Constants, "vision_picamera_right_index", 0)
         )
@@ -161,6 +164,7 @@ class VisionDetector:
             f"picamera_size={self.picamera_width}x{self.picamera_height} "
             f"format={self.picamera_main_format}"
         )
+        print(f"[VISION] picamera_color_order={self.picamera_color_order}")
         print(
             f"[VISION] picamera_size_by_cam RIGHT={self.picamera_right_width}x{self.picamera_right_height} "
             f"LEFT={self.picamera_left_width}x{self.picamera_left_height}"
@@ -248,8 +252,7 @@ class VisionDetector:
             print(f"[VISION] Picamera2 init failed for camera {camera_num}: {exc}")
             return None
 
-    @staticmethod
-    def _to_bgr(frame):
+    def _to_bgr(self, frame):
         if frame is None:
             return None
         if len(frame.shape) == 2:
@@ -257,8 +260,12 @@ class VisionDetector:
         if len(frame.shape) == 3:
             channels = frame.shape[2]
             if channels == 3:
+                if self.picamera_color_order == "BGR":
+                    return frame
                 return cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
             if channels == 4:
+                if self.picamera_color_order == "BGR":
+                    return cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
                 return cv2.cvtColor(frame, cv2.COLOR_RGBA2BGR)
         return frame
 
