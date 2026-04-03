@@ -28,7 +28,7 @@ from target_service import TargetEsp32Service
 
 
 class CombinedEsp32Service:
-    """Single UART service that tries victim first, then target detection."""
+    """Single UART service that tries target first, then victim detection."""
 
     def __init__(
         self,
@@ -75,12 +75,12 @@ class CombinedEsp32Service:
         return written
 
     def _detect_combined(self, camera_id: int) -> int:
-        victim_id = self.detector.detect_victim(camera_id)
+        target_result = self.detector.detect_target(camera_id)
+        victim_id = TargetDetector.victim_id_from_result(target_result)
         if victim_id != VICTIM_NONE:
             return victim_id
 
-        target_result = self.detector.detect_target(camera_id)
-        return TargetDetector.victim_id_from_result(target_result)
+        return self.detector.detect_victim(camera_id)
 
     def listen_and_respond(self) -> None:
         if self.port is None:
@@ -88,7 +88,7 @@ class CombinedEsp32Service:
 
         print("\n=== Vision System - COMBINED Listener Mode ===")
         print(f"Victim model: {self.detector.model_path.name}")
-        print("Flow: victim first, target fallback when victim is NONE")
+        print("Flow: target first, victim fallback when target is NONE")
         print("Waiting for ESP detection requests... (Ctrl+C to exit)\n")
 
         try:
