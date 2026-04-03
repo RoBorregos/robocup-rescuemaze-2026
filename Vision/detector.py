@@ -85,6 +85,9 @@ class VisionDetector:
         self.picamera_color_order = str(
             getattr(Constants, "vision_picamera_color_order", "BGR")
         ).strip().upper()
+        self.picamera_tuning_file = str(
+            getattr(Constants, "vision_picamera_tuning_file", "")
+        ).strip()
         self.picamera_right_idx = int(
             getattr(Constants, "vision_picamera_right_index", 0)
         )
@@ -165,6 +168,7 @@ class VisionDetector:
             f"format={self.picamera_main_format}"
         )
         print(f"[VISION] picamera_color_order={self.picamera_color_order}")
+        print(f"[VISION] picamera_tuning_file={self.picamera_tuning_file or 'default'}")
         print(
             f"[VISION] picamera_size_by_cam RIGHT={self.picamera_right_width}x{self.picamera_right_height} "
             f"LEFT={self.picamera_left_width}x{self.picamera_left_height}"
@@ -223,7 +227,10 @@ class VisionDetector:
         except Exception:
             return None
         try:
-            picam = Picamera2(camera_num)
+            if self.picamera_tuning_file:
+                picam = Picamera2(camera_num, tuning=self.picamera_tuning_file)
+            else:
+                picam = Picamera2(camera_num)
             if side == "left":
                 desired_width = self.picamera_left_width
                 desired_height = self.picamera_left_height

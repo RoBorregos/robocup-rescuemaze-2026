@@ -39,6 +39,9 @@ vision_picamera_main_format = "RGB888"
 # Color order returned by Picamera2 frames before CV processing.
 # Use "BGR" if image looks blue-tinted, "RGB" if colors look correct already.
 vision_picamera_color_order = "BGR"
+# Optional Picamera2 tuning file. Use the same one that works with rpicam-hello.
+# Example IMX219 noir tuning:
+vision_picamera_tuning_file = "/usr/share/libcamera/ipa/rpi/pisp/imx219_noir.json"
 # Explicit Picamera2 camera mapping for CSI setups.
 # Typical default: RIGHT=0, LEFT=1 (adjust if physically swapped).
 vision_picamera_right_index = 0
