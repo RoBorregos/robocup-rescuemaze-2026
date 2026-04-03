@@ -209,12 +209,11 @@ class VisionDetector:
             right_ok = self._can_read_once(self.cap_right)
             left_ok = self._can_read_once(self.cap_left)
 
-        if right_ok and left_ok:
-            return
-
         try:
             importlib.import_module("picamera2")
         except Exception:
+            if right_ok and left_ok:
+                return
             print(
                 "[VISION] Picamera2 not available. Install with: sudo apt install -y python3-picamera2"
             )
@@ -237,36 +236,29 @@ class VisionDetector:
             model = info.get("Model", "unknown") if isinstance(info, dict) else str(info)
             print(f"[VISION] picamera2[{idx}] model={model}")
 
-        if camera_count <= 0:
-            print("[VISION] No Picamera2 cameras found")
-            return
-
         preferred_right = self.picamera_right_idx
         preferred_left = self.picamera_left_idx
 
-        if preferred_right < 0 or preferred_right >= camera_count:
+        if preferred_right < 0:
             preferred_right = 0
-        if preferred_left < 0 or preferred_left >= camera_count:
+        if preferred_left < 0:
             preferred_left = 1 if camera_count > 1 else 0
 
-        if preferred_left == preferred_right and camera_count > 1:
+        if preferred_left == preferred_right:
             preferred_left = 1 if preferred_right == 0 else 0
 
-        # Prefer assigning CSI camera 0 to the side that failed in OpenCV.
-        # This helps mixed setups (USB + CSI) where only one Picamera2 camera exists.
-        if not right_ok:
+        # Always try the configured Picamera2 indices first.
+        # This is the reliable path for two Camera Module 3 devices, because
+        # OpenCV/V4L2 can collapse both CSI cameras into the same index.
+        if self.picam_right is None:
             self.picam_right = self._init_picamera(preferred_right)
-            right_ok = self.picam_right is not None
+        if self.picam_left is None:
+            self.picam_left = self._init_picamera(preferred_left)
 
-        if not left_ok:
-            if camera_count >= 2:
-                self.picam_left = self._init_picamera(preferred_left)
-            elif self.picam_right is None:
-                self.picam_left = self._init_picamera(preferred_left)
-            else:
-                print(
-                    "[VISION] LEFT picamera skipped: single Picamera2 camera already used by RIGHT"
-                )
+        if self.picam_right is None and right_ok:
+            print("[VISION] RIGHT will keep using OpenCV fallback")
+        if self.picam_left is None and left_ok:
+            print("[VISION] LEFT will keep using OpenCV fallback")
 
     def _autodetect_readable_cameras(self) -> None:
         readable = []
