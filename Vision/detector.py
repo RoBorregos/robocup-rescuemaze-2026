@@ -67,6 +67,9 @@ class VisionDetector:
         self.picamera_prefer_full_fov = bool(
             getattr(Constants, "vision_picamera_prefer_full_fov", True)
         )
+        self.picamera_main_format = str(
+            getattr(Constants, "vision_picamera_main_format", "RGB888")
+        )
         self.picamera_right_idx = int(
             getattr(Constants, "vision_picamera_right_index", 0)
         )
@@ -143,7 +146,8 @@ class VisionDetector:
         )
         print(
             f"[VISION] picamera_prefer_full_fov={self.picamera_prefer_full_fov} "
-            f"picamera_size={self.picamera_width}x{self.picamera_height}"
+            f"picamera_size={self.picamera_width}x{self.picamera_height} "
+            f"format={self.picamera_main_format}"
         )
         print(
             f"[VISION] picamera_map RIGHT={self.picamera_right_idx} "
@@ -200,16 +204,19 @@ class VisionDetector:
             return None
         try:
             picam = Picamera2(camera_num)
+            main_config = {"format": self.picamera_main_format}
             if self.force_frame_size:
+                main_config["size"] = (self.frame_width, self.frame_height)
                 config = picam.create_preview_configuration(
-                    main={"size": (self.frame_width, self.frame_height)}
+                    main=main_config
                 )
             elif self.picamera_prefer_full_fov:
+                main_config["size"] = (self.picamera_width, self.picamera_height)
                 config = picam.create_preview_configuration(
-                    main={"size": (self.picamera_width, self.picamera_height)}
+                    main=main_config
                 )
             else:
-                config = picam.create_preview_configuration()
+                config = picam.create_preview_configuration(main=main_config)
             picam.configure(config)
             self._apply_autofocus_controls(picam)
             picam.start()
@@ -217,6 +224,20 @@ class VisionDetector:
         except Exception as exc:
             print(f"[VISION] Picamera2 init failed for camera {camera_num}: {exc}")
             return None
+
+    @staticmethod
+    def _to_bgr(frame):
+        if frame is None:
+            return None
+        if len(frame.shape) == 2:
+            return cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+        if len(frame.shape) == 3:
+            channels = frame.shape[2]
+            if channels == 3:
+                return cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+            if channels == 4:
+                return cv2.cvtColor(frame, cv2.COLOR_RGBA2BGR)
+        return frame
 
     def _apply_autofocus_controls(self, picam) -> None:
         mode_name = (
@@ -476,7 +497,9 @@ class VisionDetector:
             try:
                 frame = self.picam_right.capture_array()
                 if frame is not None:
-                    return True, cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                    frame_bgr = self._to_bgr(frame)
+                    if frame_bgr is not None:
+                        return True, frame_bgr
             except Exception:
                 pass
             if self.block_opencv_right:
@@ -489,7 +512,9 @@ class VisionDetector:
             try:
                 frame = self.picam_left.capture_array()
                 if frame is not None:
-                    return True, cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                    frame_bgr = self._to_bgr(frame)
+                    if frame_bgr is not None:
+                        return True, frame_bgr
             except Exception:
                 pass
         if self.block_opencv_left:

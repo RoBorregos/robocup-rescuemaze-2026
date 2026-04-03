@@ -26,6 +26,8 @@ vision_frame_height = 480
 vision_picamera_width = 1640
 vision_picamera_height = 1232
 vision_picamera_prefer_full_fov = True
+# Preferred Picamera2 main stream format (RGB888 recommended for CV pipeline).
+vision_picamera_main_format = "RGB888"
 # Explicit Picamera2 camera mapping for CSI setups.
 # Typical default: RIGHT=0, LEFT=1 (adjust if physically swapped).
 vision_picamera_right_index = 0
