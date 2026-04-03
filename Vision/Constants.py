@@ -25,14 +25,14 @@ vision_frame_height = 480
 # For IMX219, 1640x1232 usually preserves more FoV than 640x480.
 vision_picamera_width = 1640
 vision_picamera_height = 1232
-# Per-camera override (useful with mixed sensors like IMX219 + IMX708).
+# Per-camera override (useful for dual IMX219 setups).
 # RIGHT (example IMX219 fisheye): middle point between full sensor and half-res.
 # Keeps 4:3 and usually looks more natural than 1640x1232.
 vision_picamera_right_width = 1920
 vision_picamera_right_height = 1440
-# LEFT (example IMX708): 16:9
-vision_picamera_left_width = 2304
-vision_picamera_left_height = 1296
+# LEFT (same IMX219 profile for consistency).
+vision_picamera_left_width = 1920
+vision_picamera_left_height = 1440
 vision_picamera_prefer_full_fov = True
 # Preferred Picamera2 main stream format (RGB888 recommended for CV pipeline).
 vision_picamera_main_format = "RGB888"
