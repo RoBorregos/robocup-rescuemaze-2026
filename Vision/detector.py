@@ -73,22 +73,40 @@ class VisionDetector:
         self.picamera_left_idx = int(
             getattr(Constants, "vision_picamera_left_index", 1)
         )
+        self.prefer_picamera2 = bool(
+            getattr(Constants, "vision_prefer_picamera2", True)
+        )
 
         self.cam_right_idx = getattr(Constants, "camera_right_index", 0)
         self.cam_left_idx = getattr(Constants, "camera_left_index", 1)
 
-        self.cap_right = self._open_capture(self.cam_right_idx)
-        self.cap_left = self._open_capture(self.cam_left_idx)
-        self._configure_capture(self.cap_right)
-        self._configure_capture(self.cap_left)
-
         self.picam_right = None
         self.picam_left = None
 
-        if not self.cap_right.isOpened() or not self.cap_left.isOpened():
+        self.cap_right = cv2.VideoCapture()
+        self.cap_left = cv2.VideoCapture()
+
+        if self.prefer_picamera2:
+            self.picam_right = self._init_picamera(self.picamera_right_idx)
+            self.picam_left = self._init_picamera(self.picamera_left_idx)
+
+        if self.picam_right is None or self.picam_left is None:
+            self.cap_right = self._open_capture(self.cam_right_idx)
+            self.cap_left = self._open_capture(self.cam_left_idx)
+            self._configure_capture(self.cap_right)
+            self._configure_capture(self.cap_left)
+
+        if (self.picam_right is None or self.picam_left is None) and (
+            not self.cap_right.isOpened() or not self.cap_left.isOpened()
+        ):
             self._autodetect_cameras()
 
-        if not self.cap_right.isOpened() and not self.cap_left.isOpened():
+        if (
+            self.picam_right is None
+            and self.picam_left is None
+            and not self.cap_right.isOpened()
+            and not self.cap_left.isOpened()
+        ):
             raise RuntimeError("Could not open any camera (RIGHT/LEFT)")
 
         print(
@@ -107,9 +125,10 @@ class VisionDetector:
             f"[VISION] picamera_map RIGHT={self.picamera_right_idx} "
             f"LEFT={self.picamera_left_idx}"
         )
+        print(f"[VISION] prefer_picamera2={self.prefer_picamera2}")
         print(
-            f"[VISION] RIGHT idx={self.cam_right_idx} open={self.cap_right.isOpened()} | "
-            f"LEFT idx={self.cam_left_idx} open={self.cap_left.isOpened()}"
+            f"[VISION] RIGHT idx={self.cam_right_idx} open={self.cap_right.isOpened()} picam={self.picam_right is not None} | "
+            f"LEFT idx={self.cam_left_idx} open={self.cap_left.isOpened()} picam={self.picam_left is not None}"
         )
         names = getattr(self.model, "names", None)
         if isinstance(names, dict):
@@ -201,6 +220,9 @@ class VisionDetector:
             print(f"[VISION] autofocus config skipped: {exc}")
 
     def _activate_picamera2_if_needed(self) -> None:
+        if self.prefer_picamera2 and self.picam_right is not None and self.picam_left is not None:
+            return
+
         right_ok = self._can_read_once(self.cap_right)
         left_ok = self._can_read_once(self.cap_left)
 
