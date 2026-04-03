@@ -76,12 +76,21 @@ class VisionDetector:
         self.prefer_picamera2 = bool(
             getattr(Constants, "vision_prefer_picamera2", True)
         )
+        self.disable_opencv_fallback_when_picamera_preferred = bool(
+            getattr(
+                Constants,
+                "vision_disable_opencv_fallback_when_picamera_preferred",
+                True,
+            )
+        )
 
         self.cam_right_idx = getattr(Constants, "camera_right_index", 0)
         self.cam_left_idx = getattr(Constants, "camera_left_index", 1)
 
         self.picam_right = None
         self.picam_left = None
+        self.block_opencv_right = False
+        self.block_opencv_left = False
 
         self.cap_right = cv2.VideoCapture()
         self.cap_left = cv2.VideoCapture()
@@ -90,13 +99,28 @@ class VisionDetector:
             self.picam_right = self._init_picamera(self.picamera_right_idx)
             self.picam_left = self._init_picamera(self.picamera_left_idx)
 
-        if self.picam_right is None or self.picam_left is None:
+            if (
+                self.disable_opencv_fallback_when_picamera_preferred
+                and self.picam_right is None
+            ):
+                self.block_opencv_right = True
+            if (
+                self.disable_opencv_fallback_when_picamera_preferred
+                and self.picam_left is None
+            ):
+                self.block_opencv_left = True
+
+        if self.picam_right is None and not self.block_opencv_right:
             self.cap_right = self._open_capture(self.cam_right_idx)
-            self.cap_left = self._open_capture(self.cam_left_idx)
             self._configure_capture(self.cap_right)
+        if self.picam_left is None and not self.block_opencv_left:
+            self.cap_left = self._open_capture(self.cam_left_idx)
             self._configure_capture(self.cap_left)
 
-        if (self.picam_right is None or self.picam_left is None) and (
+        if (
+            (self.picam_right is None and not self.block_opencv_right)
+            or (self.picam_left is None and not self.block_opencv_left)
+        ) and (
             not self.cap_right.isOpened() or not self.cap_left.isOpened()
         ):
             self._autodetect_cameras()
@@ -129,6 +153,9 @@ class VisionDetector:
         print(
             f"[VISION] RIGHT idx={self.cam_right_idx} open={self.cap_right.isOpened()} picam={self.picam_right is not None} | "
             f"LEFT idx={self.cam_left_idx} open={self.cap_left.isOpened()} picam={self.picam_left is not None}"
+        )
+        print(
+            f"[VISION] block_opencv_fallback RIGHT={self.block_opencv_right} LEFT={self.block_opencv_left}"
         )
         names = getattr(self.model, "names", None)
         if isinstance(names, dict):
@@ -274,8 +301,12 @@ class VisionDetector:
         # OpenCV/V4L2 can collapse both CSI cameras into the same index.
         if self.picam_right is None:
             self.picam_right = self._init_picamera(preferred_right)
+            if self.picam_right is not None:
+                self.block_opencv_right = False
         if self.picam_left is None:
             self.picam_left = self._init_picamera(preferred_left)
+            if self.picam_left is not None:
+                self.block_opencv_left = False
 
         if self.picam_right is None and right_ok:
             print("[VISION] RIGHT will keep using OpenCV fallback")
@@ -448,6 +479,8 @@ class VisionDetector:
                     return True, cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
             except Exception:
                 pass
+            if self.block_opencv_right:
+                return False, None
             if self.cap_right is not None:
                 return self.cap_right.read()
             return False, None
@@ -459,6 +492,8 @@ class VisionDetector:
                     return True, cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
             except Exception:
                 pass
+        if self.block_opencv_left:
+            return False, None
         if self.cap_left is not None:
             return self.cap_left.read()
         return False, None
