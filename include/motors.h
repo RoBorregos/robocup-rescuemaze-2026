@@ -53,7 +53,7 @@ private:
   uint16_t kMinSpeedRotate = 5;
   static constexpr uint16_t kMaxSpeedRotate = 30;
   static constexpr uint16_t kMinSpeedFormard = 5;
-  static constexpr uint16_t kMaxSpeedFormard = 40;
+  static constexpr uint16_t kMaxSpeedFormard = 50;
   static constexpr uint16_t kSpeedRampUp = 20;
   static constexpr uint16_t kSpeedRampDown = 9;
   // ramp
