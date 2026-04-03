@@ -55,6 +55,21 @@ vision_left_gain_g = 1.00
 vision_left_gain_r = 1.00
 vision_left_hue_shift = 0.0
 vision_left_saturation_scale = 1.00
+
+# Bullseye geometry tuning (ROI + circle permissiveness for fisheye lenses).
+# Global defaults:
+target_roi_pad_ratio = 0.10
+target_roi_min_pad = 8
+target_roi_force_square = True
+target_circle_min_radius_ratio = 0.10
+target_circle_min_circularity = 0.30
+target_circle_contour_min_area = 250.0
+target_circle_border_allow_ratio = 0.08
+
+# RIGHT camera (0) override: a bit more permissive.
+target_right_roi_pad_ratio = 0.15
+target_right_circle_min_circularity = 0.24
+target_right_circle_border_allow_ratio = 0.14
 # Explicit Picamera2 camera mapping for CSI setups.
 # Typical default: RIGHT=0, LEFT=1 (adjust if physically swapped).
 vision_picamera_right_index = 0

@@ -20,6 +20,7 @@ import cv2
 import numpy as np
 from ultralytics import YOLO
 
+import Constants
 from detector import VisionDetector
 from protocol import (
     CAM_LEFT,
@@ -92,7 +93,22 @@ def resolve_model_path(model_arg: str = "target.pt") -> Path:
     )
 
 
-def detect_target_roi_with_yolo(img, model, conf: float = 0.4):
+def _get_geom_setting(camera_id: int | None, name: str, default):
+    if camera_id == CAM_RIGHT:
+        return getattr(Constants, f"target_right_{name}", getattr(Constants, f"target_{name}", default))
+    if camera_id == CAM_LEFT:
+        return getattr(Constants, f"target_left_{name}", getattr(Constants, f"target_{name}", default))
+    return getattr(Constants, f"target_{name}", default)
+
+
+def detect_target_roi_with_yolo(
+    img,
+    model,
+    conf: float = 0.4,
+    pad_ratio: float = 0.05,
+    min_pad: int = 4,
+    force_square: bool = False,
+):
     """Detect the target with YOLO and return the largest bbox plus ROI."""
     h_img, w_img = img.shape[:2]
     results = model(img, conf=conf, verbose=False)[0]
@@ -116,11 +132,23 @@ def detect_target_roi_with_yolo(img, model, conf: float = 0.4):
     if best is None:
         return None
 
-    pad = max(4, int(min(best["x2"] - best["x1"], best["y2"] - best["y1"]) * 0.05))
-    rx1 = max(0, best["x1"] - pad)
-    ry1 = max(0, best["y1"] - pad)
-    rx2 = min(w_img, best["x2"] + pad)
-    ry2 = min(h_img, best["y2"] + pad)
+    box_w = best["x2"] - best["x1"]
+    box_h = best["y2"] - best["y1"]
+    pad = max(int(min_pad), int(min(box_w, box_h) * float(pad_ratio)))
+
+    if force_square:
+        cx = (best["x1"] + best["x2"]) // 2
+        cy = (best["y1"] + best["y2"]) // 2
+        half = int(max(box_w, box_h) / 2) + pad
+        rx1 = max(0, cx - half)
+        ry1 = max(0, cy - half)
+        rx2 = min(w_img, cx + half)
+        ry2 = min(h_img, cy + half)
+    else:
+        rx1 = max(0, best["x1"] - pad)
+        ry1 = max(0, best["y1"] - pad)
+        rx2 = min(w_img, best["x2"] + pad)
+        ry2 = min(h_img, best["y2"] + pad)
 
     roi = img[ry1:ry2, rx1:rx2]
     if roi.size == 0:
@@ -150,18 +178,25 @@ def classify_color_hsv(h, s, v):
     return "unknown"
 
 
-def find_largest_circle(img):
+def find_largest_circle(
+    img,
+    min_radius_ratio: float = 0.15,
+    min_circularity: float = 0.50,
+    contour_min_area: float = 500.0,
+    border_allow_ratio: float = 0.0,
+):
     """Find the biggest circle via Hough sweep + contour fallback."""
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     blurred = cv2.GaussianBlur(gray, (9, 9), 2)
     h_img, w_img = img.shape[:2]
     max_r = max(h_img, w_img) // 2
-    min_r = int(min(h_img, w_img) * 0.15)
+    min_r = int(min(h_img, w_img) * float(min_radius_ratio))
+    border_allow = int(min(h_img, w_img) * float(border_allow_ratio))
 
     best = None
-    for dp in [1.0, 1.2, 1.5]:
+    for dp in [1.0, 1.2, 1.5, 1.8]:
         for p1 in [50, 80, 120]:
-            for p2 in [30, 50, 70]:
+            for p2 in [22, 30, 40, 50, 70]:
                 circles = cv2.HoughCircles(
                     blurred,
                     cv2.HOUGH_GRADIENT,
@@ -175,9 +210,9 @@ def find_largest_circle(img):
                 if circles is not None:
                     for c in circles[0]:
                         ccx, ccy, cr = int(c[0]), int(c[1]), int(c[2])
-                        if ccx - cr < 0 or ccx + cr >= w_img:
+                        if ccx - cr < -border_allow or ccx + cr >= w_img + border_allow:
                             continue
-                        if ccy - cr < 0 or ccy + cr >= h_img:
+                        if ccy - cr < -border_allow or ccy + cr >= h_img + border_allow:
                             continue
                         if best is None or cr > best[2]:
                             best = (ccx, ccy, cr)
@@ -187,21 +222,21 @@ def find_largest_circle(img):
     contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     for cnt in contours:
         area = cv2.contourArea(cnt)
-        if area < 500:
+        if area < float(contour_min_area):
             continue
         peri = cv2.arcLength(cnt, True)
         if peri == 0:
             continue
         circ = 4 * np.pi * area / (peri**2)
-        if circ > 0.5:
+        if circ > float(min_circularity):
             (cx, cy), radius = cv2.minEnclosingCircle(cnt)
             r = int(radius)
             ccx, ccy = int(cx), int(cy)
             if r < min_r:
                 continue
-            if ccx - r < 0 or ccx + r >= w_img:
+            if ccx - r < -border_allow or ccx + r >= w_img + border_allow:
                 continue
-            if ccy - r < 0 or ccy + r >= h_img:
+            if ccy - r < -border_allow or ccy + r >= h_img + border_allow:
                 continue
             if best is None or r > best[2]:
                 best = (ccx, ccy, r)
@@ -253,14 +288,31 @@ def vote_label(label_history: Deque[str], new_label: str):
     return max(vote_counts, key=vote_counts.get)
 
 
-def detect_bullseye_frame(frame, model=None, yolo_conf: float = 0.4, label_history=None):
+def detect_bullseye_frame(
+    frame,
+    model=None,
+    yolo_conf: float = 0.4,
+    label_history=None,
+    camera_id: int | None = None,
+):
     img = frame.copy()
     orig = frame.copy()
     bbox = None
     yolo_score = None
 
     if model is not None:
-        yolo_result = detect_target_roi_with_yolo(img, model, conf=yolo_conf)
+        roi_pad_ratio = float(_get_geom_setting(camera_id, "roi_pad_ratio", 0.05))
+        roi_min_pad = int(_get_geom_setting(camera_id, "roi_min_pad", 4))
+        roi_force_square = bool(_get_geom_setting(camera_id, "roi_force_square", False))
+
+        yolo_result = detect_target_roi_with_yolo(
+            img,
+            model,
+            conf=yolo_conf,
+            pad_ratio=roi_pad_ratio,
+            min_pad=roi_min_pad,
+            force_square=roi_force_square,
+        )
         if yolo_result is None:
             print("[WARN] YOLO did not find a valid target box")
             return None
@@ -272,7 +324,13 @@ def detect_bullseye_frame(frame, model=None, yolo_conf: float = 0.4, label_histo
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     h_img, w_img = img.shape[:2]
 
-    result = find_largest_circle(img)
+    result = find_largest_circle(
+        img,
+        min_radius_ratio=float(_get_geom_setting(camera_id, "circle_min_radius_ratio", 0.15)),
+        min_circularity=float(_get_geom_setting(camera_id, "circle_min_circularity", 0.50)),
+        contour_min_area=float(_get_geom_setting(camera_id, "circle_contour_min_area", 500.0)),
+        border_allow_ratio=float(_get_geom_setting(camera_id, "circle_border_allow_ratio", 0.0)),
+    )
     if result is None:
         print("[INFO] No valid target found (no circle fully inside the image)")
         return None
@@ -405,13 +463,20 @@ class TargetDetector:
             model=self.model,
             yolo_conf=self.conf,
             label_history=label_history,
+            camera_id=None,
         )
 
     def detect_camera_frame(self, detector: VisionDetector, camera_id: int, label_history=None):
         ok, frame = detector.read_frame(camera_id)
         if not ok or frame is None:
             return None
-        return self.detect_frame(frame, label_history=label_history)
+        return detect_bullseye_frame(
+            frame,
+            model=self.model,
+            yolo_conf=self.conf,
+            label_history=label_history,
+            camera_id=camera_id,
+        )
 
     @staticmethod
     def victim_id_from_result(result) -> int:
@@ -474,6 +539,7 @@ def run_camera_with_detector(camera_streams, model=None, yolo_conf: float = 0.4,
                     model=model,
                     yolo_conf=yolo_conf,
                     label_history=histories[cam_name],
+                    camera_id=cam_id,
                 )
                 vis = frame if result is None else result["vis"]
                 label = "NONE" if result is None else result["stable_label"]
