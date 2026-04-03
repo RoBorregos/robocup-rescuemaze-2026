@@ -26,9 +26,10 @@ vision_frame_height = 480
 vision_picamera_width = 1640
 vision_picamera_height = 1232
 # Per-camera override (useful with mixed sensors like IMX219 + IMX708).
-# RIGHT (example IMX219 fisheye): 1280x720 worked better in field tests.
-vision_picamera_right_width = 1640
-vision_picamera_right_height = 1232
+# RIGHT (example IMX219 fisheye): middle point between full sensor and half-res.
+# Keeps 4:3 and usually looks more natural than 1640x1232.
+vision_picamera_right_width = 1920
+vision_picamera_right_height = 1440
 # LEFT (example IMX708): 16:9
 vision_picamera_left_width = 2304
 vision_picamera_left_height = 1296
