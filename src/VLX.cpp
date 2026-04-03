@@ -15,7 +15,7 @@ void VLX::begin() {
       ;
   }
   VLX_.setMeasurementTimingBudgetMicroSeconds(kTimingBudget);
-  VLX_.startRangeContinuous();
+  VLX_.startRangeContinuous(100);
   Serial.println("VL53L0X inicilaized properly.");
 }
 
@@ -25,13 +25,24 @@ float VLX::getDistance() {
   mux_.selectChannel();
 
   uint16_t rawRange = VLX_.readRange();
+  uint16_t status = VLX_.readRangeStatus();
   if (VLX_.timeoutOccurred()) {
     // preserve previous valid distance if timeout
     return distance;
   }
 
-  distance = (float)(rawRange) / 10.0f;
-  return distance;
+  if (status != 4) {
+    distance = (float)(rawRange) / 10.0f;
+    return distance;
+  } else {
+    rawRange = VLX_.readRange();
+    status = VLX_.readRangeStatus();
+    if (status != 4) {
+      distance = (float)(rawRange) / 10.0f;
+      return distance;
+    }
+  }
+  return 819.0f;
 }
 
 void VLX::printDistance() {
