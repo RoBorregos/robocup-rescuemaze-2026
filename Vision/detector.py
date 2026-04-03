@@ -64,6 +64,18 @@ class VisionDetector:
         self.frame_height = getattr(Constants, "vision_frame_height", 480)
         self.picamera_width = int(getattr(Constants, "vision_picamera_width", 1640))
         self.picamera_height = int(getattr(Constants, "vision_picamera_height", 1232))
+        self.picamera_right_width = int(
+            getattr(Constants, "vision_picamera_right_width", self.picamera_width)
+        )
+        self.picamera_right_height = int(
+            getattr(Constants, "vision_picamera_right_height", self.picamera_height)
+        )
+        self.picamera_left_width = int(
+            getattr(Constants, "vision_picamera_left_width", self.picamera_width)
+        )
+        self.picamera_left_height = int(
+            getattr(Constants, "vision_picamera_left_height", self.picamera_height)
+        )
         self.picamera_prefer_full_fov = bool(
             getattr(Constants, "vision_picamera_prefer_full_fov", True)
         )
@@ -99,8 +111,8 @@ class VisionDetector:
         self.cap_left = cv2.VideoCapture()
 
         if self.prefer_picamera2:
-            self.picam_right = self._init_picamera(self.picamera_right_idx)
-            self.picam_left = self._init_picamera(self.picamera_left_idx)
+            self.picam_right = self._init_picamera(self.picamera_right_idx, "right")
+            self.picam_left = self._init_picamera(self.picamera_left_idx, "left")
 
             if (
                 self.disable_opencv_fallback_when_picamera_preferred
@@ -150,6 +162,10 @@ class VisionDetector:
             f"format={self.picamera_main_format}"
         )
         print(
+            f"[VISION] picamera_size_by_cam RIGHT={self.picamera_right_width}x{self.picamera_right_height} "
+            f"LEFT={self.picamera_left_width}x{self.picamera_left_height}"
+        )
+        print(
             f"[VISION] picamera_map RIGHT={self.picamera_right_idx} "
             f"LEFT={self.picamera_left_idx}"
         )
@@ -197,13 +213,20 @@ class VisionDetector:
             f"size={width}x{height} fps={fps:.2f} fourcc={fourcc or 'N/A'}"
         )
 
-    def _init_picamera(self, camera_num: int):
+    def _init_picamera(self, camera_num: int, side: str = "right"):
         try:
             Picamera2 = importlib.import_module("picamera2").Picamera2
         except Exception:
             return None
         try:
             picam = Picamera2(camera_num)
+            if side == "left":
+                desired_width = self.picamera_left_width
+                desired_height = self.picamera_left_height
+            else:
+                desired_width = self.picamera_right_width
+                desired_height = self.picamera_right_height
+
             main_config = {"format": self.picamera_main_format}
             if self.force_frame_size:
                 main_config["size"] = (self.frame_width, self.frame_height)
@@ -211,7 +234,7 @@ class VisionDetector:
                     main=main_config
                 )
             elif self.picamera_prefer_full_fov:
-                main_config["size"] = (self.picamera_width, self.picamera_height)
+                main_config["size"] = (desired_width, desired_height)
                 config = picam.create_preview_configuration(
                     main=main_config
                 )
@@ -321,11 +344,11 @@ class VisionDetector:
         # This is the reliable path for two Camera Module 3 devices, because
         # OpenCV/V4L2 can collapse both CSI cameras into the same index.
         if self.picam_right is None:
-            self.picam_right = self._init_picamera(preferred_right)
+            self.picam_right = self._init_picamera(preferred_right, "right")
             if self.picam_right is not None:
                 self.block_opencv_right = False
         if self.picam_left is None:
-            self.picam_left = self._init_picamera(preferred_left)
+            self.picam_left = self._init_picamera(preferred_left, "left")
             if self.picam_left is not None:
                 self.block_opencv_left = False
 
