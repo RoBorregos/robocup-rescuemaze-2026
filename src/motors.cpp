@@ -10,7 +10,7 @@ void motors::setupMotors() {
   Wire.begin();
   delay(10);
   Wire.setClock(400000);
-  // screenBegin();
+  screenBegin();
   bno.setupBNO();
   setupVlx(vlxID::left);
   setupVlx(vlxID::frontRight);
@@ -18,7 +18,8 @@ void motors::setupMotors() {
   setupVlx(vlxID::frontLeft);
   setupVlx(vlxID::back);
   setupTCS();
-
+  limitSwitch_[LimitSwitchID::kLeft].initLimitSwitch(Pins::limitSwitchPins[LimitSwitchID::kLeft]);
+  limitSwitch_[LimitSwitchID::kRight].initLimitSwitch(Pins::limitSwitchPins[LimitSwitchID::kRight]);
   for (uint8_t i = 0; i < 4; i++) {
     motor[i].initialize(Pins::digitalOne[i], Pins::digitalTwo[i],
                         Pins::pwmPin[i], i);
@@ -130,7 +131,7 @@ void motors::ahead() {
         break;
       if (isRamp())
         break;
-      // limitCrash();
+      limitCrash();
       distance = (frontVlx ? max(vlx[vlxID::frontLeft].getDistance(),
                                  vlx[vlxID::frontRight].getDistance())
                            : vlx[vlxID::back].getDistance());
@@ -155,7 +156,7 @@ void motors::ahead() {
   } else if (encoder) {
     while (getAvergeTics() < kTicsPerTile - offset) {
       setahead();
-      // limitCrash();
+      limitCrash();
       // checkTileColor();
       if (blackTile)
         return;
@@ -273,11 +274,17 @@ void motors::passObstacle() {
   rotate(targetAngle_);
   limitColition = false;
 }
-/*
+
 void motors::limitCrash(){
     float targetAngle_=targetAngle;
     bool leftState=limitSwitch_[LimitSwitchID::kLeft].getState();
     bool rightState=limitSwitch_[LimitSwitchID::kRight].getState();
+    /*delayMicroseconds(4500); // 4.5ms (4500 microseconds)
+    if (leftState != limitSwitch_[LimitSwitchID::kLeft].getState(); || rightState != limitSwitch_[LimitSwitchID::kRight].getState()) {
+      leftState = limitSwitch_[LimitSwitchID::kLeft].getState();
+      rightState = limitSwitch_[LimitSwitchID::kRight].getState();
+    }
+    */
     if(slope) return;
     if(rampState!=0 ){
         if(leftState || rightState) limitColition=true;
@@ -286,29 +293,23 @@ void motors::limitCrash(){
     if((leftState && rightState) || (!leftState && !rightState)){
         return;
     }
-    else if(rightState){
-        screenPrint("RightLimit");
-        Serial.println("rightlimit");
-        if(targetAngle==360){
-            targetAngle=0;
-        }
-        rotate(targetAngle+25);
-    }else if(leftState){
-        screenPrint("leftLimit");
-        Serial.println("rightlimit");
-        if(targetAngle==0){
-            targetAngle=360;
-        }
-        rotate(targetAngle-25);
+    if (vlx[vlxID::back].getDistance() > 20) {
+    moveDistance(kTileLength / 5, false);
     }
-    delay(300);
-    moveDistance(kTileLength/6,false);
-    delay(300);
-    targetAngle=targetAngle_;
-    rotate(targetAngle);
-    limitColition=false;
+    if (leftState || rightState) {
+      float sideAngle = targetAngle + (leftState ? 25 : -25);
+      if (sideAngle >= 360)
+        sideAngle -= 360;
+      if (sideAngle < 0)
+        sideAngle += 360;
+
+      rotate(sideAngle);
+      moveDistance(3 * kTileLength / 10, true);
+    }
+    rotate(targetAngle_);
+    limitColition = false;
 }
-*/
+
 uint8_t motors::findNearest(float number, const uint8_t numbers[], uint8_t size,
                             bool frontVlx) {
   if (frontVlx)
@@ -646,7 +647,7 @@ void motors::ramp() {
   while (bno.getOrientationY() > 7) {
     if (buttonPressed == true)
       break;
-    // limitCrash();
+    limitCrash();
     if (limitColition == true) {
       stop();
       break;
@@ -673,7 +674,7 @@ void motors::ramp() {
   while (bno.getOrientationY() < -7) {
     if (buttonPressed == true)
       break;
-    // limitCrash();
+    limitCrash();
     if (limitColition == true)
       break;
     float error;

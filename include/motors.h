@@ -4,6 +4,7 @@
 #include "PID.h"
 #include "TCS.h"
 #include "VLX.h"
+#include "LimitSwitch.h"
 #include "motor.h"
 #include <Arduino.h>
 #include <ESP32Servo.h>
@@ -97,7 +98,7 @@ public:
   Adafruit_VL53L0X lox = Adafruit_VL53L0X();
   BNO bno;
   TCS tcs_;
-  // LimitSwitch limitSwitch_[2];
+  LimitSwitch limitSwitch_[2];
   VLX vlx[kNumVlx];
   Servo servo;
   Motor motor[4];
