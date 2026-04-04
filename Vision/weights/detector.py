@@ -31,14 +31,17 @@ from protocol import (
 
 def resolve_model_path() -> Path:
     base = Path(__file__).resolve().parent
-    onnx_path = base / "weights" / "best.onnx"
+    maze_pt_path = base / "weights" / "best_maze_model.pt"
     pt_path = base / "weights" / "best.pt"
+    onnx_path = base / "weights" / "best.onnx"
+    if maze_pt_path.exists():
+        return maze_pt_path
     if pt_path.exists():
         return pt_path
     if onnx_path.exists():
         return onnx_path
     raise FileNotFoundError(
-        "No model found in Vision/weights (expected best.onnx or best.pt)"
+        "No model found in Vision/weights (expected best_maze_model.pt, best.pt or best.onnx)"
     )
 
 
