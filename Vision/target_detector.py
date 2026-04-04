@@ -534,7 +534,19 @@ class TargetDetector:
     def victim_id_from_result(result) -> int:
         if not result:
             return VICTIM_NONE
-        return TARGET_LABEL_TO_VICTIM_ID.get(result.get("stable_label", "Fake_target"), VICTIM_NONE)
+        raw_label = result.get("victim_label")
+        if isinstance(raw_label, str):
+            mapped = TARGET_LABEL_TO_VICTIM_ID.get(raw_label)
+            if mapped is not None:
+                return mapped
+
+        stable_label = result.get("stable_label")
+        if isinstance(stable_label, str):
+            mapped = TARGET_LABEL_TO_VICTIM_ID.get(stable_label)
+            if mapped is not None:
+                return mapped
+
+        return VICTIM_NONE
 
 
 def parse_camera_mode(source_text: str):
