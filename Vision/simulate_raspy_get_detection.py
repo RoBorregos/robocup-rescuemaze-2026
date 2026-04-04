@@ -9,6 +9,8 @@ response packet building used by UART services.
 
 from __future__ import annotations
 
+import cv2
+
 from detector import VisionDetector
 from protocol import (
     CAM_LEFT,
@@ -34,6 +36,35 @@ def detect_with_best_available(detector: VisionDetector, camera_id: int) -> int:
     if callable(combined_method):
         return int(combined_method(camera_id))
     return int(detector.detect_victim(camera_id))
+
+
+def show_camera_detection_preview(detector: VisionDetector, camera_id: int, victim_id: int) -> None:
+    ok, frame = detector.read_frame(camera_id)
+    if not ok or frame is None:
+        print(f"[SIM PREVIEW] No frame for {camera_name(camera_id)}")
+        return
+
+    label = f"{camera_name(camera_id)} -> {victim_name(victim_id)}"
+    cv2.putText(
+        frame,
+        label,
+        (12, 28),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.8,
+        (0, 0, 0),
+        3,
+    )
+    cv2.putText(
+        frame,
+        label,
+        (12, 28),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.8,
+        (0, 255, 255),
+        2,
+    )
+    cv2.imshow(f"SIM {camera_name(camera_id)}", frame)
+    cv2.waitKey(1)
 
 
 def main() -> None:
@@ -85,8 +116,10 @@ def main() -> None:
                     f"[SIM TX] {tx_packet.hex(' ').upper()} | CAM={camera_name(req_camera_id)} "
                     f"VICTIM={victim_name(victim_id)}"
                 )
+                show_camera_detection_preview(detector, req_camera_id, victim_id)
 
     finally:
+        cv2.destroyAllWindows()
         detector.close()
         print("\n[SIM] Finalizado")
 
