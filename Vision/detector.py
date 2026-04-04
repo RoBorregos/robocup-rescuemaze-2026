@@ -23,18 +23,24 @@ import Constants
 from protocol import (
     CAM_LEFT,
     CAM_RIGHT,
+    VICTIM_HARMED,
     VICTIM_NONE,
     VICTIM_OMEGA,
     VICTIM_PHI,
     VICTIM_PSI,
+    VICTIM_STABLE,
+    VICTIM_UNHARMED,
 )
 
 
 def resolve_model_path() -> Path:
     base = Path(__file__).resolve().parent
+    final_pt_path = base / "weights" / "modelo_robocup_final.pt"
     maze_pt_path = base / "weights" / "best_maze_model.pt"
     pt_path = base / "weights" / "best.pt"
     onnx_path = base / "weights" / "best.onnx"
+    if final_pt_path.exists():
+        return final_pt_path
     if maze_pt_path.exists():
         return maze_pt_path
     if pt_path.exists():
@@ -42,7 +48,7 @@ def resolve_model_path() -> Path:
     if onnx_path.exists():
         return onnx_path
     raise FileNotFoundError(
-        "No model found in Vision/weights (expected best_maze_model.pt, best.pt or best.onnx)"
+        "No model found in Vision/weights (expected modelo_robocup_final.pt, best_maze_model.pt, best.pt or best.onnx)"
     )
 
 
@@ -60,6 +66,23 @@ class VisionDetector:
         )
         self.inference_timeout_ms = int(
             getattr(Constants, "vision_inference_timeout_ms", 180)
+        )
+        self.target_class_keywords = tuple(
+            str(keyword).strip().lower()
+            for keyword in getattr(
+                Constants,
+                "vision_target_class_keywords",
+                ["target", "bullseye"],
+            )
+        )
+        self.target_crop_pad_ratio = float(
+            getattr(Constants, "vision_target_crop_pad_ratio", 0.12)
+        )
+        self.target_conf_threshold = float(
+            getattr(Constants, "vision_target_conf_threshold", self.conf)
+        )
+        self.letter_conf_threshold = float(
+            getattr(Constants, "vision_letter_conf_threshold", self.conf)
         )
         self.force_frame_size = bool(
             getattr(Constants, "vision_force_frame_size", False)
@@ -648,9 +671,100 @@ class VisionDetector:
         print(f"[VISION] unmapped class='{class_name}' -> NONE")
         return VICTIM_NONE
 
+    def _is_target_class(self, class_name: str) -> bool:
+        text = class_name.strip().lower()
+        if not text:
+            return False
+        return any(keyword and keyword in text for keyword in self.target_class_keywords)
+
+    @staticmethod
+    def _crop_bbox(frame, bbox, pad_ratio: float):
+        h_img, w_img = frame.shape[:2]
+        x1, y1, x2, y2 = bbox
+        box_w = max(1, x2 - x1)
+        box_h = max(1, y2 - y1)
+        pad = int(min(box_w, box_h) * max(0.0, pad_ratio))
+        rx1 = max(0, x1 - pad)
+        ry1 = max(0, y1 - pad)
+        rx2 = min(w_img, x2 + pad)
+        ry2 = min(h_img, y2 + pad)
+        roi = frame[ry1:ry2, rx1:rx2]
+        return roi, (rx1, ry1, rx2, ry2)
+
+    def _run_model(self, frame):
+        results = self.model.predict(
+            frame,
+            conf=self.conf,
+            iou=self.iou,
+            imgsz=self.imgsz,
+            device=self.device,
+            verbose=False,
+        )
+        if not results:
+            return None
+        return results[0]
+
+    def _extract_best_candidates(self, result):
+        boxes = result.boxes
+        names = result.names
+        if boxes is None or len(boxes) == 0:
+            return None, None
+
+        best_letter = None
+        best_target = None
+
+        for index in range(len(boxes)):
+            conf = float(boxes.conf[index].item())
+            class_id = int(boxes.cls[index].item())
+            class_name = (
+                names.get(class_id, str(class_id))
+                if isinstance(names, dict)
+                else str(class_id)
+            )
+            mapped_letter = self._class_to_victim_id(class_name)
+
+            if mapped_letter != VICTIM_NONE and conf >= self.letter_conf_threshold:
+                if best_letter is None or conf > best_letter["conf"]:
+                    best_letter = {
+                        "victim_id": mapped_letter,
+                        "class_name": class_name,
+                        "conf": conf,
+                    }
+
+            if self._is_target_class(class_name) and conf >= self.target_conf_threshold:
+                x1, y1, x2, y2 = map(int, boxes.xyxy[index].tolist())
+                if x2 <= x1 or y2 <= y1:
+                    continue
+                if best_target is None or conf > best_target["conf"]:
+                    best_target = {
+                        "bbox": (x1, y1, x2, y2),
+                        "class_name": class_name,
+                        "conf": conf,
+                    }
+
+        return best_letter, best_target
+
+    def _victim_id_from_target_roi(self, frame, camera_id: int, target_bbox):
+        roi, _ = self._crop_bbox(frame, target_bbox, self.target_crop_pad_ratio)
+        if roi is None or roi.size == 0:
+            return VICTIM_NONE
+
+        try:
+            from target_detector import TargetDetector, detect_bullseye_frame
+
+            analysis = detect_bullseye_frame(
+                roi,
+                model=None,
+                yolo_conf=self.conf,
+                label_history=None,
+                camera_id=camera_id,
+            )
+            return TargetDetector.victim_id_from_result(analysis)
+        except Exception as exc:
+            print(f"[VISION] target ROI analysis failed: {exc}")
+            return VICTIM_NONE
+
     def detect_victim(self, camera_id: int) -> int:
-        best_conf_global = -1.0
-        best_class_name = None
         started = time.monotonic()
 
         for _ in range(self.inference_frames):
@@ -662,61 +776,83 @@ class VisionDetector:
             if not ok or frame is None:
                 continue
 
-            results = self.model.predict(
-                frame,
-                conf=self.conf,
-                iou=self.iou,
-                imgsz=self.imgsz,
-                device=self.device,
-                verbose=False,
-            )
-            if not results:
+            result = self._run_model(frame)
+            if result is None:
                 continue
 
-            result = results[0]
-            boxes = result.boxes
-            names = result.names
-            if boxes is None or len(boxes) == 0:
-                continue
+            best_letter, _ = self._extract_best_candidates(result)
+            if best_letter is not None:
+                print(
+                    f"[VISION] top_letter={best_letter['class_name']} conf={best_letter['conf']:.3f}"
+                )
+                return int(best_letter["victim_id"])
 
-            best_idx = int(boxes.conf.argmax().item())
-            best_conf = float(boxes.conf[best_idx].item())
-            class_id = int(boxes.cls[best_idx].item())
-            class_name = (
-                names.get(class_id, str(class_id))
-                if isinstance(names, dict)
-                else str(class_id)
-            )
+        print(
+            f"[VISION] no letter detections cam={'RIGHT' if camera_id == CAM_RIGHT else 'LEFT'}"
+        )
+        return VICTIM_NONE
 
-            mapped = self._class_to_victim_id(class_name)
-            if mapped != VICTIM_NONE:
-                print(f"[VISION] top_class={class_name} conf={best_conf:.3f}")
-                return mapped
-
-            if best_conf > best_conf_global:
-                best_conf_global = best_conf
-                best_class_name = class_name
-
-        if best_class_name is None:
-            print(
-                f"[VISION] no detections cam={'RIGHT' if camera_id == CAM_RIGHT else 'LEFT'}"
-            )
+    def detect_combined(self, camera_id: int) -> int:
+        ok, frame = self.read_frame(camera_id)
+        if not ok or frame is None:
             return VICTIM_NONE
 
-        print(f"[VISION] top_class={best_class_name} conf={best_conf_global:.3f}")
-        return self._class_to_victim_id(best_class_name)
+        result = self._run_model(frame)
+        if result is None:
+            return VICTIM_NONE
+
+        best_letter, best_target = self._extract_best_candidates(result)
+        if best_target is not None:
+            target_victim_id = self._victim_id_from_target_roi(
+                frame,
+                camera_id,
+                best_target["bbox"],
+            )
+            if target_victim_id in (VICTIM_HARMED, VICTIM_STABLE, VICTIM_UNHARMED):
+                print(
+                    f"[VISION] target_class={best_target['class_name']} conf={best_target['conf']:.3f}"
+                )
+                return target_victim_id
+
+        if best_letter is not None:
+            return int(best_letter["victim_id"])
+
+        return VICTIM_NONE
 
     def detect_target(self, camera_id: int):
-        """Detect a bullseye target using the same camera workflow."""
-        if self._target_detector is None:
-            from target_detector import TargetDetector
-
-            self._target_detector = TargetDetector()
-
+        """Detect a bullseye target with unified model first, dedicated model fallback."""
         ok, frame = self.read_frame(camera_id)
         if not ok or frame is None:
             cam_name = "RIGHT" if camera_id == CAM_RIGHT else "LEFT"
             print(f"[VISION] no frame available for {cam_name} target detection")
             return None
+
+        result = self._run_model(frame)
+        if result is not None:
+            _, best_target = self._extract_best_candidates(result)
+            if best_target is not None:
+                roi, _ = self._crop_bbox(frame, best_target["bbox"], self.target_crop_pad_ratio)
+                if roi is not None and roi.size > 0:
+                    try:
+                        from target_detector import detect_bullseye_frame
+
+                        return detect_bullseye_frame(
+                            roi,
+                            model=None,
+                            yolo_conf=self.conf,
+                            label_history=None,
+                            camera_id=camera_id,
+                        )
+                    except Exception as exc:
+                        print(f"[VISION] unified target analysis failed: {exc}")
+
+        if self._target_detector is None:
+            try:
+                from target_detector import TargetDetector
+
+                self._target_detector = TargetDetector()
+            except Exception as exc:
+                print(f"[VISION] target fallback detector unavailable: {exc}")
+                return None
 
         return self._target_detector.detect_frame(frame)

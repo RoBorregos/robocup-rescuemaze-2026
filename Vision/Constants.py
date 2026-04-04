@@ -46,7 +46,7 @@ vision_picamera_tuning_file = "/usr/share/libcamera/ipa/rpi/pisp/imx219_noir.jso
 vision_right_gain_b = 1.00
 vision_right_gain_g = 0.92
 vision_right_gain_r = 1.06
-vision_right_hue_shift = -2.0
+vision_right_hue_shift = 0.0
 vision_right_saturation_scale = 1.10
 # LEFT camera (1): neutral defaults.
 vision_left_gain_b = 1.00
@@ -87,6 +87,11 @@ vision_disable_opencv_fallback_when_picamera_preferred = True
 vision_device = "cpu"
 vision_inference_frames = 1
 vision_inference_timeout_ms = 180
+# Unified model routing (single .pt with target + letters).
+vision_target_class_keywords = ["target", "bullseye"]
+vision_target_crop_pad_ratio = 0.12
+vision_target_conf_threshold = 0.30
+vision_letter_conf_threshold = 0.35
 
 # Autofocus (Raspberry Camera Module 3)
 # Modes: "continuous", "auto", "manual", "off"

@@ -46,7 +46,7 @@ class TargetEsp32Service:
         self.port: Optional[Serial] = None
         self.packet_reader = PacketReader()
         self.camera_detector = VisionDetector()
-        self.detector = TargetDetector()
+        self.detector = None
 
     def connect(self) -> None:
         while True:
@@ -93,7 +93,7 @@ class TargetEsp32Service:
             raise RuntimeError("Serial port not connected")
 
         print("\n=== Vision System - TARGET Listener Mode ===")
-        print(f"Model: {self.detector.model_path.name}")
+        print(f"Model: {self.camera_detector.model_path.name}")
         print(
             "Sending UNHARMED/STABLE/HARMED/FAKE_TARGET (or NONE if unknown)"
         )
@@ -121,8 +121,8 @@ class TargetEsp32Service:
                     print("[REQ] Ignored packet (not detection request)")
                     continue
 
-                result = self.detector.detect_camera_frame(self.camera_detector, camera_id)
-                victim_id = self.detector.victim_id_from_result(result)
+                result = self.camera_detector.detect_target(camera_id)
+                victim_id = TargetDetector.victim_id_from_result(result)
                 self.send_vision_packet(camera_id, victim_id)
                 print(
                     f"[SENT] CAM={camera_name(camera_id)} VICTIM={victim_name(victim_id)}"

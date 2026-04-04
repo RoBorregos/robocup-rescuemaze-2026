@@ -15,7 +15,6 @@ import Constants
 from detector import VisionDetector
 from protocol import (
     PacketReader,
-    VICTIM_NONE,
     build_victim_packet_for_name,
     camera_name,
     parse_detection_request,
@@ -23,7 +22,6 @@ from protocol import (
     victim_name,
 )
 from service import Esp32Service
-from target_detector import TargetDetector
 from target_service import TargetEsp32Service
 
 
@@ -75,12 +73,7 @@ class CombinedEsp32Service:
         return written
 
     def _detect_combined(self, camera_id: int) -> int:
-        target_result = self.detector.detect_target(camera_id)
-        victim_id = TargetDetector.victim_id_from_result(target_result)
-        if victim_id != VICTIM_NONE:
-            return victim_id
-
-        return self.detector.detect_victim(camera_id)
+        return self.detector.detect_combined(camera_id)
 
     def listen_and_respond(self) -> None:
         if self.port is None:
