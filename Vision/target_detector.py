@@ -175,9 +175,9 @@ def classify_color_hsv(h, s, v):
         return "white"
     if s < 35:
         return "gray"
-    if 18 <= h <= 35 and s > 50:
+    if 18 <= h <= 40 and s > 50:
         return "yellow"
-    if 35 < h <= 85 and s > 30:
+    if 40 < h <= 85 and s > 30:
         return "green"
     if 85 < h <= 135 and s > 40:
         return "blue"
