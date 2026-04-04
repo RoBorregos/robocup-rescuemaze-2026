@@ -13,9 +13,9 @@ baud_rate = 115200
 timeout = 0.5
 
 # Vision settings
-vision_conf_threshold = 0.25
+vision_conf_threshold = 0.50
 vision_imgsz = 640
-vision_iou_threshold = 0.30
+vision_iou_threshold = 0.10
 # If True, force camera output size to vision_frame_width/height.
 # If False, keep camera native/default mode (recommended for fisheye to avoid crop).
 vision_force_frame_size = False
