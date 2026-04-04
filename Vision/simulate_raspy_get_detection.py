@@ -1,0 +1,95 @@
+#!/usr/bin/env python3
+
+"""Interactive simulator for Raspberry detection requests.
+
+Type `0` or `1` in terminal to simulate a detection request for RIGHT/LEFT camera.
+This script does not require serial hardware; it reuses the same protocol parsing and
+response packet building used by UART services.
+"""
+
+from __future__ import annotations
+
+from detector import VisionDetector
+from protocol import (
+    CAM_LEFT,
+    CAM_RIGHT,
+    PacketReader,
+    build_victim_packet_for_name,
+    camera_name,
+    parse_detection_request,
+    rebuild_packet_bytes,
+    victim_name,
+)
+
+
+def build_detection_request(camera_id: int) -> bytes:
+    payload = bytes([0x01, camera_id])
+    payload_len = len(payload)
+    checksum = (payload_len + sum(payload)) & 0xFF
+    return bytes([0xFF, 0xAA, payload_len, *payload, checksum])
+
+
+def detect_with_best_available(detector: VisionDetector, camera_id: int) -> int:
+    combined_method = getattr(detector, "detect_combined", None)
+    if callable(combined_method):
+        return int(combined_method(camera_id))
+    return int(detector.detect_victim(camera_id))
+
+
+def main() -> None:
+    reader = PacketReader()
+    detector = VisionDetector()
+
+    print("\n=== Simulador Rasp Get Detection ===")
+    print("Escribe 0 (RIGHT), 1 (LEFT), both, o q para salir.\n")
+
+    try:
+        while True:
+            cmd = input("> request camera [0/1/both/q]: ").strip().lower()
+            if cmd in {"q", "quit", "exit"}:
+                break
+
+            if cmd == "both":
+                camera_ids = [CAM_RIGHT, CAM_LEFT]
+            elif cmd == "0":
+                camera_ids = [CAM_RIGHT]
+            elif cmd == "1":
+                camera_ids = [CAM_LEFT]
+            else:
+                print("Entrada inválida. Usa 0, 1, both o q.")
+                continue
+
+            for camera_id in camera_ids:
+                request = build_detection_request(camera_id)
+                print(f"[SIM RX RAW] {request.hex(' ').upper()}")
+
+                parsed_packet = None
+                for byte in request:
+                    parsed_packet = reader.feed(byte)
+                if parsed_packet is None:
+                    print("[SIM] No se pudo parsear request")
+                    continue
+
+                rebuilt = rebuild_packet_bytes(parsed_packet)
+                is_request, req_camera_id = parse_detection_request(parsed_packet)
+                print(f"[SIM RX] {rebuilt.hex(' ').upper()}")
+
+                if not is_request:
+                    print("[SIM] Paquete no reconocido como request de detección")
+                    continue
+
+                victim_id = detect_with_best_available(detector, req_camera_id)
+                tx_packet = build_victim_packet_for_name(req_camera_id, victim_id)
+
+                print(
+                    f"[SIM TX] {tx_packet.hex(' ').upper()} | CAM={camera_name(req_camera_id)} "
+                    f"VICTIM={victim_name(victim_id)}"
+                )
+
+    finally:
+        detector.close()
+        print("\n[SIM] Finalizado")
+
+
+if __name__ == "__main__":
+    main()
