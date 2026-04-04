@@ -38,11 +38,76 @@ def detect_with_best_available(detector: VisionDetector, camera_id: int) -> int:
     return int(detector.detect_victim(camera_id))
 
 
+def draw_model_detections(detector: VisionDetector, frame):
+    rendered = frame.copy()
+    target_found = False
+
+    run_model = getattr(detector, "_run_model", None)
+    if callable(run_model):
+        result = run_model(frame)
+    else:
+        predictions = detector.model.predict(
+            frame,
+            conf=detector.conf,
+            iou=detector.iou,
+            imgsz=detector.imgsz,
+            device=detector.device,
+            verbose=False,
+        )
+        result = predictions[0] if predictions else None
+
+    if result is None or result.boxes is None or len(result.boxes) == 0:
+        return rendered, target_found
+
+    names = result.names
+    is_target_class = getattr(detector, "_is_target_class", None)
+
+    for index in range(len(result.boxes)):
+        conf = float(result.boxes.conf[index].item())
+        class_id = int(result.boxes.cls[index].item())
+        class_name = (
+            names.get(class_id, str(class_id)) if isinstance(names, dict) else str(class_id)
+        )
+        x1, y1, x2, y2 = map(int, result.boxes.xyxy[index].tolist())
+
+        if callable(is_target_class) and is_target_class(class_name):
+            color = (0, 140, 255)
+            target_found = True
+        else:
+            color = (255, 180, 0)
+
+        cv2.rectangle(rendered, (x1, y1), (x2, y2), color, 2)
+        text = f"{class_name} {conf:.2f}"
+        text_y = y1 - 8 if y1 > 18 else y1 + 16
+        cv2.putText(
+            rendered,
+            text,
+            (x1, text_y),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (0, 0, 0),
+            3,
+        )
+        cv2.putText(
+            rendered,
+            text,
+            (x1, text_y),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            color,
+            1,
+        )
+
+    return rendered, target_found
+
+
 def show_camera_detection_preview(detector: VisionDetector, camera_id: int, victim_id: int) -> None:
     ok, frame = detector.read_frame(camera_id)
     if not ok or frame is None:
         print(f"[SIM PREVIEW] No frame for {camera_name(camera_id)}")
         return
+
+    frame, target_found = draw_model_detections(detector, frame)
 
     label = f"{camera_name(camera_id)} -> {victim_name(victim_id)}"
     cv2.putText(
@@ -63,6 +128,27 @@ def show_camera_detection_preview(detector: VisionDetector, camera_id: int, vict
         (0, 255, 255),
         2,
     )
+
+    if target_found:
+        cv2.putText(
+            frame,
+            "TARGET DETECTED",
+            (12, 58),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.7,
+            (0, 0, 0),
+            3,
+        )
+        cv2.putText(
+            frame,
+            "TARGET DETECTED",
+            (12, 58),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.7,
+            (0, 140, 255),
+            2,
+        )
+
     cv2.imshow(f"SIM {camera_name(camera_id)}", frame)
     cv2.waitKey(1)
 
