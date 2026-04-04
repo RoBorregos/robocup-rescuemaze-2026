@@ -41,6 +41,7 @@ def detect_with_best_available(detector: VisionDetector, camera_id: int) -> int:
 def draw_model_detections(detector: VisionDetector, frame):
     rendered = frame.copy()
     target_found = False
+    best_target = None
 
     run_model = getattr(detector, "_run_model", None)
     if callable(run_model):
@@ -73,6 +74,12 @@ def draw_model_detections(detector: VisionDetector, frame):
         if callable(is_target_class) and is_target_class(class_name):
             color = (0, 140, 255)
             target_found = True
+            if best_target is None or conf > best_target["conf"]:
+                best_target = {
+                    "bbox": (x1, y1, x2, y2),
+                    "class_name": class_name,
+                    "conf": conf,
+                }
         else:
             color = (255, 180, 0)
 
@@ -98,7 +105,55 @@ def draw_model_detections(detector: VisionDetector, frame):
             1,
         )
 
-    return rendered, target_found
+    return rendered, target_found, best_target
+
+
+def get_target_ring_colors(detector: VisionDetector, frame, camera_id: int, target_bbox):
+    crop_fn = getattr(detector, "_crop_bbox", None)
+    pad_ratio = float(getattr(detector, "target_crop_pad_ratio", 0.12))
+
+    if callable(crop_fn):
+        roi, _ = crop_fn(frame, target_bbox, pad_ratio)
+    else:
+        h_img, w_img = frame.shape[:2]
+        x1, y1, x2, y2 = target_bbox
+        box_w = max(1, x2 - x1)
+        box_h = max(1, y2 - y1)
+        pad = int(min(box_w, box_h) * max(0.0, pad_ratio))
+        rx1 = max(0, x1 - pad)
+        ry1 = max(0, y1 - pad)
+        rx2 = min(w_img, x2 + pad)
+        ry2 = min(h_img, y2 + pad)
+        roi = frame[ry1:ry2, rx1:rx2]
+
+    if roi is None or roi.size == 0:
+        return None
+
+    try:
+        from target_detector import detect_bullseye_frame
+
+        analysis = detect_bullseye_frame(
+            roi,
+            model=None,
+            yolo_conf=detector.conf,
+            label_history=None,
+            camera_id=camera_id,
+        )
+        if not analysis:
+            return None
+
+        detected = analysis.get("detected")
+        if isinstance(detected, list) and detected:
+            return detected
+
+        rings = analysis.get("rings")
+        if isinstance(rings, list):
+            colors = [ring.get("color", "unknown") for ring in rings if isinstance(ring, dict)]
+            return colors if colors else None
+        return None
+    except Exception as exc:
+        print(f"[SIM PREVIEW] target ring analysis failed: {exc}")
+        return None
 
 
 def show_camera_detection_preview(detector: VisionDetector, camera_id: int, victim_id: int) -> None:
@@ -107,7 +162,8 @@ def show_camera_detection_preview(detector: VisionDetector, camera_id: int, vict
         print(f"[SIM PREVIEW] No frame for {camera_name(camera_id)}")
         return
 
-    frame, target_found = draw_model_detections(detector, frame)
+    raw_frame = frame.copy()
+    frame, target_found, best_target = draw_model_detections(detector, frame)
 
     label = f"{camera_name(camera_id)} -> {victim_name(victim_id)}"
     cv2.putText(
@@ -148,6 +204,35 @@ def show_camera_detection_preview(detector: VisionDetector, camera_id: int, vict
             (0, 140, 255),
             2,
         )
+
+        if best_target is not None:
+            ring_colors = get_target_ring_colors(
+                detector,
+                raw_frame,
+                camera_id,
+                best_target["bbox"],
+            )
+            if ring_colors:
+                ring_text = "rings: " + "-".join(ring_colors)
+                cv2.putText(
+                    frame,
+                    ring_text,
+                    (12, 84),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.58,
+                    (0, 0, 0),
+                    3,
+                )
+                cv2.putText(
+                    frame,
+                    ring_text,
+                    (12, 84),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.58,
+                    (0, 255, 255),
+                    1,
+                )
+                print(f"[SIM TARGET] {camera_name(camera_id)} rings={ring_colors}")
 
     cv2.imshow(f"SIM {camera_name(camera_id)}", frame)
     cv2.waitKey(1)
