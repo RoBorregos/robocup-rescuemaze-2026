@@ -276,22 +276,29 @@ void motors::passObstacle() {
 }
 
 void motors::limitCrash(){
+    if(slope) return;
     float targetAngle_=targetAngle;
     bool leftState=limitSwitch_[LimitSwitchID::kLeft].getState();
     bool rightState=limitSwitch_[LimitSwitchID::kRight].getState();
-    /*delayMicroseconds(4500); // 4.5ms (4500 microseconds)
-    if (leftState != limitSwitch_[LimitSwitchID::kLeft].getState(); || rightState != limitSwitch_[LimitSwitchID::kRight].getState()) {
+    if ((leftState != limitSwitch_[LimitSwitchID::kLeft].getState()) || //If states update within a milli
+        (rightState != limitSwitch_[LimitSwitchID::kRight].getState())) {
       leftState = limitSwitch_[LimitSwitchID::kLeft].getState();
       rightState = limitSwitch_[LimitSwitchID::kRight].getState();
     }
-    */
-    if(slope) return;
     if(rampState!=0 ){
         if(leftState || rightState) limitColition=true;
         return;
     }
-    if((leftState && rightState) || (!leftState && !rightState)){
+    if(!leftState && !rightState){
         return;
+    }
+    if (leftState && rightState) {
+      if (vlx[vlxID::back].getDistance() > 20) {
+      moveDistance(kTileLength / 4, false);
+      }
+      rotate(targetAngle_);
+      limitColition = false;
+      return;
     }
     if (vlx[vlxID::back].getDistance() > 20) {
     moveDistance(kTileLength / 5, false);
