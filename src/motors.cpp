@@ -73,13 +73,17 @@ void motors::pidEncoders(int speedReference, bool ahead) {
   AngleError = constrain(AngleError, -17, 17);
   if (!ahead)
     AngleError = -AngleError;
-  PID_Wheel(speedReference + AngleError, MotorID::kFrontLeft);
+  PID_Wheel(speedReference + kSpeedLeftCorrection + AngleError, MotorID::kFrontLeft);
   PID_Wheel(speedReference + AngleError, MotorID::kBackLeft);
-  PID_Wheel(speedReference + 5 - AngleError, MotorID::kFrontRight);
+  PID_Wheel(speedReference + kSpeedCorrection - AngleError, MotorID::kFrontRight);
   PID_Wheel(speedReference - AngleError, MotorID::kBackRight);
 }
 
 void motors::ahead() {
+  float targetAngle_ = targetAngle;
+  if (abs(targetAngle_ - angle) >= minAngleToCorrect) {
+    rotate(targetAngle_);
+  }
   passObstacle();
   passObstacle(); // double verification (if obstacle still in the way rotate,
                   // else, ignore)
@@ -88,7 +92,6 @@ void motors::ahead() {
   int offset = 0;
   ;
   float distance;
-  float targetAngle_ = targetAngle;
   bool encoder, frontVlx;
   bool rampCaution = false;
   float frontDistance = max(vlx[vlxID::frontLeft].getDistance(),
@@ -177,7 +180,7 @@ void motors::ahead() {
   slope = false;
   stop();
   float angle = bno.getOrientationX();
-  if (abs(targetAngle_ - angle) >= 10) {
+  if (abs(targetAngle_ - angle) >= minAngleToCorrect) {
     rotate(targetAngle_);
   }
   if (!encoder) {
@@ -188,9 +191,9 @@ void motors::ahead() {
       float error = rampUpPID.calculate_PID(
           0, (vlx[vlxID::right].distance - vlx[vlxID::left].distance));
       error = constrain(error, -17, 17);
-      PID_Wheel(-error, MotorID::kFrontLeft);
+      PID_Wheel(-error - kSpeedLeftCorrection, MotorID::kFrontLeft);
       PID_Wheel(-error, MotorID::kBackLeft);
-      PID_Wheel(error + 5, MotorID::kFrontRight);
+      PID_Wheel(error + kSpeedCorrection, MotorID::kFrontRight);
       PID_Wheel(error, MotorID::kBackRight);
     }
   }
@@ -410,9 +413,9 @@ float motors::changeSpeedMove(bool encoders, bool rotate, int targetDistance,
     missingAngle = abs(targetAngle - (targetAngle == 0 ? z_rotation : angle));
     speed = map(missingAngle, 90, 0, kMaxSpeedRotate, kMinSpeedRotate);
     speed = constrain(speed, kMinSpeedRotate, kMaxSpeedRotate);
-    PID_Wheel(speed, MotorID::kFrontLeft);
+    PID_Wheel(speed + kSpeedLeftCorrection, MotorID::kFrontLeft);
     PID_Wheel(speed, MotorID::kBackLeft);
-    PID_Wheel(speed + 5, MotorID::kFrontRight);
+    PID_Wheel(speed + kSpeedCorrection, MotorID::kFrontRight);
     PID_Wheel(speed, MotorID::kBackRight);
     return 0;
   } else {
@@ -593,9 +596,9 @@ bool motors::isWall(uint8_t direction) {
   uint8_t realPos = rulet[relativeDir][direction];
   bool frontLeft = vlx[vlxID::frontLeft].isWall();
   bool frontRight = vlx[vlxID::frontRight].isWall();
-  bool right = vlx[vlxID::right].getDistance() < 20;
+  bool right = vlx[vlxID::right].getDistance() < DisToSideWall;
   bool back = vlx[vlxID::back].isWall();
-  bool left = vlx[vlxID::left].getDistance() < 20;
+  bool left = vlx[vlxID::left].getDistance() < DisToSideWall;
 
   switch (realPos) {
   case 0:

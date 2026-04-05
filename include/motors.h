@@ -56,6 +56,8 @@ private:
   static constexpr uint16_t kMaxSpeedFormard = 50;
   static constexpr uint16_t kSpeedRampUp = 20;
   static constexpr uint16_t kSpeedRampDown = 9;
+  static constexpr uint16_t kSpeedCorrection = 5;
+  static constexpr uint16_t kSpeedLeftCorrection = 0;
   // ramp
   PID rampUpPID;
   PID rampDownPID;
@@ -63,8 +65,10 @@ private:
   static constexpr float kMinRampOrientation = 18.0;
   // control Walls
   static constexpr float minDisToLateralWall = 6;
+  static constexpr float DisToSideWall = 20;
   float changeAngle = 0;
   static constexpr uint8_t maxChangeAngle = 3;
+  static constexpr uint8_t minAngleToCorrect = 10;
   // PID movement constants
   static constexpr float kP_mov = 1;
   static constexpr float kI_mov = 0.00;
