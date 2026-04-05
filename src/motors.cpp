@@ -18,6 +18,8 @@ void motors::setupMotors() {
   setupVlx(vlxID::frontLeft);
   setupVlx(vlxID::back);
   setupTCS();
+  servo.attach(Pins::servoPin);
+  servo.write(servoPos);
 
   for (uint8_t i = 0; i < 4; i++) {
     motor[i].initialize(Pins::digitalOne[i], Pins::digitalTwo[i],
@@ -783,8 +785,8 @@ void motors::harmedVictim() {
 }
 
 void motors::stableVictim() {
-  // screenPrint("Stable");
-  victimSequency();
+  screenPrint("Stable");
+  //victimSequency();
   if (kitState == kitID::kRight) {
     kitRight(1);
   } else if (kitState == kitID::kLeft) {
@@ -800,35 +802,32 @@ void motors::unharmedVictim() {
 }
 
 void motors::kitLeft(uint8_t n) {
-  uint16_t dt = 0;
   for (uint8_t i = 0; i < n; i++) {
+    writeServo(servoPosLeft);
+    delay(500);
     writeServo(servoPosRight);
-    writeServo(servoPosLeft);
-    writeServo(10);
-    writeServo(servoPosLeft);
-    writeServo(90);
   }
 }
 void motors::writeServo(uint16_t servoAngle) {
-  servo.write(servoAngle);
-  delay(200);
-  if ((servoAngle != 10 && servoAngle != 90) && servoAngle != 170) {
-    for (uint8_t i; i < 4; i++) {
-      servo.write(servoAngle - 6);
-      delay(40);
-      servo.write(servoAngle + 6);
-      delay(40);
+  int currentAngle = servo.read();
+  int targetAngle = servoAngle;
+  if (currentAngle < targetAngle) {
+    for (int i = currentAngle; i <= targetAngle; i++) {
+      servo.write(i);
+      delay(5);
     }
-  }
+  } else if (currentAngle > targetAngle) {
+    for (int i = currentAngle; i >= targetAngle; i--) {
+      servo.write(i);
+      delay(5);
+    }
+  } 
 }
 void motors::kitRight(uint8_t n) {
-  uint16_t dt = 600;
   for (uint8_t i = 0; i < n; i++) {
+    writeServo(servoPosRight);
+    delay(500);
     writeServo(servoPosLeft);
-    writeServo(servoPosRight);
-    writeServo(170);
-    writeServo(servoPosRight);
-    writeServo(90);
   }
 }
 void motors::reloadKits() {

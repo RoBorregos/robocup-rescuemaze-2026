@@ -89,9 +89,9 @@ private:
   // movement
   bool limitColition = false;
   // servo
-  float servoPos = 90;
-  static constexpr uint16_t servoPosRight = 133;
-  static constexpr uint16_t servoPosLeft = 50;
+  float servoPos = 180;
+  static constexpr uint16_t servoPosRight = 180;
+  static constexpr uint16_t servoPosLeft = 45;
 
 public:
   // objets
