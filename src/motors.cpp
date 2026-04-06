@@ -280,41 +280,44 @@ void motors::limitCrash(){
     float targetAngle_=targetAngle;
     bool leftState=limitSwitch_[LimitSwitchID::kLeft].getState();
     bool rightState=limitSwitch_[LimitSwitchID::kRight].getState();
-    if ((leftState != limitSwitch_[LimitSwitchID::kLeft].getState()) || //If states update within a milli
-        (rightState != limitSwitch_[LimitSwitchID::kRight].getState())) {
-      leftState = limitSwitch_[LimitSwitchID::kLeft].getState();
-      rightState = limitSwitch_[LimitSwitchID::kRight].getState();
-    }
-    if(rampState!=0 ){
-        if(leftState || rightState) limitColition=true;
+    if (leftState || rightState) {
+      delay(50); // Debounce delay
+      if ((leftState != limitSwitch_[LimitSwitchID::kLeft].getState()) || //If states update within millis
+          (rightState != limitSwitch_[LimitSwitchID::kRight].getState())) {
+        leftState = limitSwitch_[LimitSwitchID::kLeft].getState();
+        rightState = limitSwitch_[LimitSwitchID::kRight].getState();
+      }
+      if(rampState!=0 ){
+          if(leftState || rightState) limitColition=true;
+          return;
+      }
+      if(!leftState && !rightState){
+          return;
+      }
+      if (leftState && rightState) {
+        if (vlx[vlxID::back].getDistance() > 20) {
+        moveDistance(kTileLength / 3, false);
+        }
+        rotate(targetAngle_);
+        limitColition = false;
         return;
-    }
-    if(!leftState && !rightState){
-        return;
-    }
-    if (leftState && rightState) {
+      }
       if (vlx[vlxID::back].getDistance() > 20) {
-      moveDistance(kTileLength / 4, false);
+      moveDistance(kTileLength / 5, false);
+      }
+      if (leftState || rightState) {
+        float sideAngle = targetAngle + (leftState ? 25 : -25);
+        if (sideAngle >= 360)
+          sideAngle -= 360;
+        if (sideAngle < 0)
+          sideAngle += 360;
+
+        rotate(sideAngle);
+        moveDistance(3 * kTileLength / 10, true);
       }
       rotate(targetAngle_);
       limitColition = false;
-      return;
-    }
-    if (vlx[vlxID::back].getDistance() > 20) {
-    moveDistance(kTileLength / 5, false);
-    }
-    if (leftState || rightState) {
-      float sideAngle = targetAngle + (leftState ? 25 : -25);
-      if (sideAngle >= 360)
-        sideAngle -= 360;
-      if (sideAngle < 0)
-        sideAngle += 360;
-
-      rotate(sideAngle);
-      moveDistance(3 * kTileLength / 10, true);
-    }
-    rotate(targetAngle_);
-    limitColition = false;
+  }
 }
 
 uint8_t motors::findNearest(float number, const uint8_t numbers[], uint8_t size,
