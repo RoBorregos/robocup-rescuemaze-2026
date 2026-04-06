@@ -109,9 +109,11 @@ class VisionDetector:
         self.picamera_main_format = str(
             getattr(Constants, "vision_picamera_main_format", "RGB888")
         )
-        self.picamera_color_order = str(
-            getattr(Constants, "vision_picamera_color_order", "BGR")
-        ).strip().upper()
+        self.picamera_color_order = (
+            str(getattr(Constants, "vision_picamera_color_order", "BGR"))
+            .strip()
+            .upper()
+        )
         self.picamera_tuning_file = str(
             getattr(Constants, "vision_picamera_tuning_file", "")
         ).strip()
@@ -123,8 +125,12 @@ class VisionDetector:
         self.left_gain_r = float(getattr(Constants, "vision_left_gain_r", 1.0))
         self.right_hue_shift = float(getattr(Constants, "vision_right_hue_shift", 0.0))
         self.left_hue_shift = float(getattr(Constants, "vision_left_hue_shift", 0.0))
-        self.right_sat_scale = float(getattr(Constants, "vision_right_saturation_scale", 1.0))
-        self.left_sat_scale = float(getattr(Constants, "vision_left_saturation_scale", 1.0))
+        self.right_sat_scale = float(
+            getattr(Constants, "vision_right_saturation_scale", 1.0)
+        )
+        self.left_sat_scale = float(
+            getattr(Constants, "vision_left_saturation_scale", 1.0)
+        )
         self.picamera_right_idx = int(
             getattr(Constants, "vision_picamera_right_index", 0)
         )
@@ -178,9 +184,7 @@ class VisionDetector:
         if (
             (self.picam_right is None and not self.block_opencv_right)
             or (self.picam_left is None and not self.block_opencv_left)
-        ) and (
-            not self.cap_right.isOpened() or not self.cap_left.isOpened()
-        ):
+        ) and (not self.cap_right.isOpened() or not self.cap_left.isOpened()):
             self._autodetect_cameras()
 
         if (
@@ -286,14 +290,10 @@ class VisionDetector:
             main_config = {"format": self.picamera_main_format}
             if self.force_frame_size:
                 main_config["size"] = (self.frame_width, self.frame_height)
-                config = picam.create_preview_configuration(
-                    main=main_config
-                )
+                config = picam.create_preview_configuration(main=main_config)
             elif self.picamera_prefer_full_fov:
                 main_config["size"] = (desired_width, desired_height)
-                config = picam.create_preview_configuration(
-                    main=main_config
-                )
+                config = picam.create_preview_configuration(main=main_config)
             else:
                 config = picam.create_preview_configuration(main=main_config)
             picam.configure(config)
@@ -404,7 +404,11 @@ class VisionDetector:
             print(f"[VISION] autofocus config skipped: {exc}")
 
     def _activate_picamera2_if_needed(self) -> None:
-        if self.prefer_picamera2 and self.picam_right is not None and self.picam_left is not None:
+        if (
+            self.prefer_picamera2
+            and self.picam_right is not None
+            and self.picam_left is not None
+        ):
             return
 
         right_ok = self._can_read_once(self.cap_right)
@@ -439,7 +443,9 @@ class VisionDetector:
             camera_count = 0
         print(f"[VISION] picamera2 available cameras={camera_count}")
         for idx, info in enumerate(camera_info):
-            model = info.get("Model", "unknown") if isinstance(info, dict) else str(info)
+            model = (
+                info.get("Model", "unknown") if isinstance(info, dict) else str(info)
+            )
             print(f"[VISION] picamera2[{idx}] model={model}")
 
         preferred_right = self.picamera_right_idx
@@ -494,7 +500,9 @@ class VisionDetector:
             self.cam_right_idx = new_right
             self.cap_right = self._open_capture(self.cam_right_idx)
             self._configure_capture(self.cap_right)
-            print(f"[VISION] RIGHT reassigned to readable OpenCV index={self.cam_right_idx}")
+            print(
+                f"[VISION] RIGHT reassigned to readable OpenCV index={self.cam_right_idx}"
+            )
 
         used_idx = self.cam_right_idx if self._can_read_once(self.cap_right) else None
         left_candidates = [idx for idx in readable if idx != used_idx]
@@ -507,7 +515,9 @@ class VisionDetector:
                 self.cam_left_idx = new_left
                 self.cap_left = self._open_capture(self.cam_left_idx)
                 self._configure_capture(self.cap_left)
-                print(f"[VISION] LEFT reassigned to readable OpenCV index={self.cam_left_idx}")
+                print(
+                    f"[VISION] LEFT reassigned to readable OpenCV index={self.cam_left_idx}"
+                )
             else:
                 if self.cap_left is not None:
                     self.cap_left.release()
@@ -675,7 +685,9 @@ class VisionDetector:
         text = class_name.strip().lower()
         if not text:
             return False
-        return any(keyword and keyword in text for keyword in self.target_class_keywords)
+        return any(
+            keyword and keyword in text for keyword in self.target_class_keywords
+        )
 
     @staticmethod
     def _crop_bbox(frame, bbox, pad_ratio: float):
@@ -831,7 +843,9 @@ class VisionDetector:
         if result is not None:
             _, best_target = self._extract_best_candidates(result)
             if best_target is not None:
-                roi, _ = self._crop_bbox(frame, best_target["bbox"], self.target_crop_pad_ratio)
+                roi, _ = self._crop_bbox(
+                    frame, best_target["bbox"], self.target_crop_pad_ratio
+                )
                 if roi is not None and roi.size > 0:
                     try:
                         from target_detector import detect_bullseye_frame

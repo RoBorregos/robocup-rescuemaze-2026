@@ -95,9 +95,17 @@ def resolve_model_path(model_arg: str = "target.pt") -> Path:
 
 def _get_geom_setting(camera_id: int | None, name: str, default):
     if camera_id == CAM_RIGHT:
-        return getattr(Constants, f"target_right_{name}", getattr(Constants, f"target_{name}", default))
+        return getattr(
+            Constants,
+            f"target_right_{name}",
+            getattr(Constants, f"target_{name}", default),
+        )
     if camera_id == CAM_LEFT:
-        return getattr(Constants, f"target_left_{name}", getattr(Constants, f"target_{name}", default))
+        return getattr(
+            Constants,
+            f"target_left_{name}",
+            getattr(Constants, f"target_{name}", default),
+        )
     return getattr(Constants, f"target_{name}", default)
 
 
@@ -284,7 +292,9 @@ def classify_ring(
     """Classify a ring region by HSV majority vote on sampled pixels."""
     h_img, w_img = hsv.shape[:2]
     angles = np.linspace(0, 2 * np.pi, n_angles, endpoint=False)
-    n_radial = max(int(min_radial_samples), (r_outer - r_inner) // max(1, int(radial_divisor)))
+    n_radial = max(
+        int(min_radial_samples), (r_outer - r_inner) // max(1, int(radial_divisor))
+    )
     radii = np.linspace(r_inner, r_outer, n_radial, endpoint=False)
 
     votes = {}
@@ -361,10 +371,18 @@ def detect_bullseye_frame(
 
     result = find_largest_circle(
         img,
-        min_radius_ratio=float(_get_geom_setting(camera_id, "circle_min_radius_ratio", 0.15)),
-        min_circularity=float(_get_geom_setting(camera_id, "circle_min_circularity", 0.50)),
-        contour_min_area=float(_get_geom_setting(camera_id, "circle_contour_min_area", 500.0)),
-        border_allow_ratio=float(_get_geom_setting(camera_id, "circle_border_allow_ratio", 0.0)),
+        min_radius_ratio=float(
+            _get_geom_setting(camera_id, "circle_min_radius_ratio", 0.15)
+        ),
+        min_circularity=float(
+            _get_geom_setting(camera_id, "circle_min_circularity", 0.50)
+        ),
+        contour_min_area=float(
+            _get_geom_setting(camera_id, "circle_contour_min_area", 500.0)
+        ),
+        border_allow_ratio=float(
+            _get_geom_setting(camera_id, "circle_border_allow_ratio", 0.0)
+        ),
         fast_mode=_is_fast_mode(camera_id),
     )
     if result is None:
@@ -401,8 +419,14 @@ def detect_bullseye_frame(
         mask = ((dist >= r_inner) & (dist < r_outer)).astype(np.uint8)
         bgr_px = img[mask == 1]
         hsv_px = hsv[mask == 1]
-        avg_rgb = tuple(np.mean(bgr_px, axis=0).astype(int)[[2, 1, 0]]) if len(bgr_px) else (0, 0, 0)
-        avg_hsv = tuple(np.mean(hsv_px, axis=0).astype(int)) if len(hsv_px) else (0, 0, 0)
+        avg_rgb = (
+            tuple(np.mean(bgr_px, axis=0).astype(int)[[2, 1, 0]])
+            if len(bgr_px)
+            else (0, 0, 0)
+        )
+        avg_hsv = (
+            tuple(np.mean(hsv_px, axis=0).astype(int)) if len(hsv_px) else (0, 0, 0)
+        )
 
         ring_data.append(
             {
@@ -464,7 +488,15 @@ def detect_bullseye_frame(
         gx, gy = cx + x1, cy + y1
         bcolor = BOX_COLOR.get(stable_label, (255, 255, 255))
         cv2.rectangle(vis, (x1, y1), (x2, y2), bcolor, 2)
-        cv2.putText(vis, f"YOLO {yolo_score:.2f}", (x1, max(15, y1 - 7)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, bcolor, 2)
+        cv2.putText(
+            vis,
+            f"YOLO {yolo_score:.2f}",
+            (x1, max(15, y1 - 7)),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            bcolor,
+            2,
+        )
 
     cv2.circle(vis, (gx, gy), outer_r, (255, 255, 255), 2)
     for d in ring_data:
@@ -476,16 +508,32 @@ def detect_bullseye_frame(
         vh, vw = vis.shape[:2]
         lx = max(5, min(lx, vw - 70))
         ly = max(15, min(ly, vh - 5))
-        cv2.putText(vis, d["color"], (lx, ly), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 0), 2)
-        cv2.putText(vis, d["color"], (lx, ly), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
+        cv2.putText(
+            vis, d["color"], (lx, ly), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 0), 2
+        )
+        cv2.putText(
+            vis,
+            d["color"],
+            (lx, ly),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.45,
+            (255, 255, 255),
+            1,
+        )
     cv2.circle(vis, (gx, gy), 4, (0, 0, 255), -1)
 
     tag_color = BOX_COLOR.get(stable_label, (200, 200, 200))
-    cv2.putText(vis, stable_label, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 0), 3)
-    cv2.putText(vis, stable_label, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, tag_color, 2)
+    cv2.putText(
+        vis, stable_label, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 0), 3
+    )
+    cv2.putText(
+        vis, stable_label, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, tag_color, 2
+    )
 
     sum_text = f"sum={ring_sum}  rings: {' '.join(detected)}"
-    cv2.putText(vis, sum_text, (10, 55), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (220, 220, 220), 1)
+    cv2.putText(
+        vis, sum_text, (10, 55), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (220, 220, 220), 1
+    )
 
     return {
         "center": (cx, cy),
@@ -518,7 +566,9 @@ class TargetDetector:
             camera_id=None,
         )
 
-    def detect_camera_frame(self, detector: VisionDetector, camera_id: int, label_history=None):
+    def detect_camera_frame(
+        self, detector: VisionDetector, camera_id: int, label_history=None
+    ):
         ok, frame = detector.read_frame(camera_id)
         if not ok or frame is None:
             return None
@@ -560,9 +610,13 @@ def parse_camera_mode(source_text: str):
     return None
 
 
-def run_camera_with_detector(camera_streams, model=None, yolo_conf: float = 0.4, show: bool = True):
+def run_camera_with_detector(
+    camera_streams, model=None, yolo_conf: float = 0.4, show: bool = True
+):
     detector = VisionDetector()
-    has_display = bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")) and show
+    has_display = (
+        bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")) and show
+    )
     histories = {name: deque(maxlen=TEMPORAL_VOTE_SIZE) for name, _ in camera_streams}
     frame_shape_logged = set()
 
@@ -631,7 +685,9 @@ def detect_bullseye(image_path, model=None, yolo_conf: float = 0.4, label_histor
         print(f"[ERROR] Cannot read image: {image_path}")
         return None
 
-    result = detect_bullseye_frame(img, model=model, yolo_conf=yolo_conf, label_history=label_history)
+    result = detect_bullseye_frame(
+        img, model=model, yolo_conf=yolo_conf, label_history=label_history
+    )
     if result is None:
         return None
 
@@ -642,13 +698,30 @@ def detect_bullseye(image_path, model=None, yolo_conf: float = 0.4, label_histor
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Bullseye detector with victim classification")
-    parser.add_argument("image_path", nargs="?", default="", help="Path to input image (optional if --source is used)")
-    parser.add_argument("--source", default="", help="Source: image/video path, camera index, or left/right/both (default: 0)")
+    parser = argparse.ArgumentParser(
+        description="Bullseye detector with victim classification"
+    )
+    parser.add_argument(
+        "image_path",
+        nargs="?",
+        default="",
+        help="Path to input image (optional if --source is used)",
+    )
+    parser.add_argument(
+        "--source",
+        default="",
+        help="Source: image/video path, camera index, or left/right/both (default: 0)",
+    )
     parser.add_argument("--model", default="target.pt", help="YOLO model (.pt) path")
-    parser.add_argument("--conf", type=float, default=0.4, help="YOLO confidence threshold")
-    parser.add_argument("--no-yolo", action="store_true", help="Skip YOLO and analyze full image")
-    parser.add_argument("--show", action="store_true", default=True, help="Show visualization window")
+    parser.add_argument(
+        "--conf", type=float, default=0.4, help="YOLO confidence threshold"
+    )
+    parser.add_argument(
+        "--no-yolo", action="store_true", help="Skip YOLO and analyze full image"
+    )
+    parser.add_argument(
+        "--show", action="store_true", default=True, help="Show visualization window"
+    )
     args = parser.parse_args()
 
     input_source = args.source.strip() if args.source else ""
@@ -668,11 +741,18 @@ def main() -> None:
     is_image = input_source.lower().endswith(img_extensions)
 
     if is_image:
-        detect_bullseye(input_source, model=yolo_model, yolo_conf=args.conf, label_history=label_history)
+        detect_bullseye(
+            input_source,
+            model=yolo_model,
+            yolo_conf=args.conf,
+            label_history=label_history,
+        )
     else:
         camera_mode = parse_camera_mode(input_source)
         if camera_mode is not None:
-            run_camera_with_detector(camera_mode, model=yolo_model, yolo_conf=args.conf, show=args.show)
+            run_camera_with_detector(
+                camera_mode, model=yolo_model, yolo_conf=args.conf, show=args.show
+            )
             print("[INFO] Done.")
         else:
             source = int(input_source) if input_source.isdigit() else input_source
@@ -687,7 +767,12 @@ def main() -> None:
                 if not ok:
                     break
 
-                result = detect_bullseye_frame(frame, model=yolo_model, yolo_conf=args.conf, label_history=label_history)
+                result = detect_bullseye_frame(
+                    frame,
+                    model=yolo_model,
+                    yolo_conf=args.conf,
+                    label_history=label_history,
+                )
                 vis = frame if result is None else result["vis"]
 
                 if args.show:

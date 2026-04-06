@@ -94,9 +94,7 @@ class TargetEsp32Service:
 
         print("\n=== Vision System - TARGET Listener Mode ===")
         print(f"Model: {self.camera_detector.model_path.name}")
-        print(
-            "Sending UNHARMED/STABLE/HARMED/FAKE_TARGET (or NONE if unknown)"
-        )
+        print("Sending UNHARMED/STABLE/HARMED/FAKE_TARGET (or NONE if unknown)")
         print("Waiting for ESP detection requests... (Ctrl+C to exit)\n")
 
         try:
