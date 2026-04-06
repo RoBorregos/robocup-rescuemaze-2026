@@ -35,14 +35,14 @@ constexpr uint8_t kRight = 1;
 } // namespace LimitSwitchID
 
 namespace vlxID {
-constexpr uint8_t frontLeft = 1;
-constexpr uint8_t frontRight = 3;
+constexpr uint8_t frontLeft = 3;
+constexpr uint8_t frontRight = 0;
 // constexpr uint8_t rightDown=1;
-constexpr uint8_t right = 0;
+constexpr uint8_t right = 4;
 constexpr uint8_t left = 2;
 // constexpr uint8_t front=4;
 // constexpr uint8_t leftDown=5; // backLeft
-constexpr uint8_t back = 4;
+constexpr uint8_t back = 1;
 
 } // namespace vlxID
 namespace kitID {

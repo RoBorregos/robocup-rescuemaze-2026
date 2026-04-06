@@ -20,7 +20,7 @@
 #define PCA9548A_ADDR 0x70      // PCA9548A Direction
 #define PCA9548A_CHANNEL_4 0x20 // Canal 4 (SDA4/SCL4)
 
-constexpr uint8_t edgeTileDistance = 8;
+constexpr uint8_t edgeTileDistance = 10;
 constexpr uint8_t kTileLength = 30;
 constexpr uint8_t rulet[4][4] = {
     {0, 1, 2, 3}, {3, 0, 1, 2}, {2, 3, 0, 1}, {1, 2, 3, 0}};
@@ -51,12 +51,14 @@ private:
   uint16_t kMinPwmFormard = 70;
   uint16_t kMaxPwmFormard = 180;
   // Speeds constants
-  uint16_t kMinSpeedRotate = 5;
+  uint16_t kMinSpeedRotate = 10;
   static constexpr uint16_t kMaxSpeedRotate = 30;
-  static constexpr uint16_t kMinSpeedFormard = 5;
+  static constexpr uint16_t kMinSpeedFormard = 7;
   static constexpr uint16_t kMaxSpeedFormard = 50;
   static constexpr uint16_t kSpeedRampUp = 20;
   static constexpr uint16_t kSpeedRampDown = 9;
+  static constexpr uint16_t kSpeedCorrection = 5;
+  static constexpr uint16_t kSpeedLeftCorrection = 3;
   // ramp
   PID rampUpPID;
   PID rampDownPID;
@@ -64,8 +66,10 @@ private:
   static constexpr float kMinRampOrientation = 18.0;
   // control Walls
   static constexpr float minDisToLateralWall = 6;
+  static constexpr float DisToSideWall = 20;
   float changeAngle = 0;
   static constexpr uint8_t maxChangeAngle = 3;
+  static constexpr uint8_t minAngleToCorrect = 10;
   // PID movement constants
   static constexpr float kP_mov = 1;
   static constexpr float kI_mov = 0.00;
