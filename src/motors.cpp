@@ -172,7 +172,7 @@ void motors::ahead() {
                         kMinSpeedFormard);
       speed = constrain(speed, kMinSpeedFormard, kMaxSpeedFormard);
       if (rampCaution)
-        speed = map(missingDistance, kTileLength, 0, (kMaxSpeedFormard / 3),
+        speed = map(missingDistance, kTileLength, 0, (kMaxSpeedFormard / 2),
                     kMinSpeedFormard);
       pidEncoders(speed, true);
     }
@@ -183,23 +183,11 @@ void motors::ahead() {
   if (abs(targetAngle_ - angle) >= minAngleToCorrect) {
     rotate(targetAngle_);
   }
-  if (!encoder) {
-    if ((vlx[vlxID::left].isWall()) && vlx[vlxID::right].isWall()) {
-      (vlx[vlxID::right].getDistance() <= vlx[vlxID::left].getDistance())
-          ? (setright())
-          : (setleft());
-      float error = rampUpPID.calculate_PID(
-          0, (vlx[vlxID::right].distance - vlx[vlxID::left].distance));
-      error = constrain(error, -17, 17);
-      PID_Wheel(-error - kSpeedLeftCorrection, MotorID::kFrontLeft);
-      PID_Wheel(-error, MotorID::kBackLeft);
-      PID_Wheel(error + kSpeedCorrection, MotorID::kFrontRight);
-      PID_Wheel(error, MotorID::kBackRight);
-    }
-  }
   stop();
   resetTics();
   // checkTileColor();
+  screenPrint(String (vlx[vlxID::right].getDistance())); //DONT DELETE
+  screenPrint(String (vlx[vlxID::left].getDistance())); //DONT DELETE
 }
 
 void motors::checkTileColor() {
