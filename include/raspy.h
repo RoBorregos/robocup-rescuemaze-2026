@@ -9,9 +9,30 @@
 
 // Victim IDs
 #define VICTIM_NONE 0x00
-#define VICTIM_PHI 0x01
-#define VICTIM_PSI 0x02
-#define VICTIM_OMEGA 0x03
+#define VICTIM_HARMED 0x01
+#define VICTIM_STABLE 0x02
+#define VICTIM_UNHARMED 0x03
+#define VICTIM_LETTER_H 0x04
+#define VICTIM_LETTER_S 0x05
+#define VICTIM_LETTER_U 0x06
+#define VICTIM_FAKE_TARGET 0x07
+#define VICTIM_MAX_ID VICTIM_FAKE_TARGET
+
+// Backward compatibility aliases
+#define VICTIM_PHI VICTIM_LETTER_H
+#define VICTIM_PSI VICTIM_LETTER_S
+#define VICTIM_OMEGA VICTIM_LETTER_U
+
+// Protocol victim IDs received from Raspberry Pi
+#define PROTO_VICTIM_NONE 0x00
+#define PROTO_VICTIM_PHI 0x01
+#define PROTO_VICTIM_PSI 0x02
+#define PROTO_VICTIM_OMEGA 0x03
+#define PROTO_VICTIM_HARMED 0x04
+#define PROTO_VICTIM_UNHARMED 0x05
+#define PROTO_VICTIM_STABLE 0x06
+#define PROTO_VICTIM_FAKE_TARGET 0x07
+#define PROTO_VICTIM_MAX_ID PROTO_VICTIM_FAKE_TARGET
 
 // UART Protocol constants
 #define UART_SYNC_BYTE1 0xFF
@@ -37,7 +58,7 @@ public:
   Raspy();
 
   // Request detection from Raspberry Pi (RIGHT then LEFT)
-  // Returns: VICTIM_NONE / VICTIM_PHI / VICTIM_PSI / VICTIM_OMEGA
+  // Returns victim IDs (target or letter classes)
   uint8_t getDetection();
   uint8_t getVictim() const;
 
@@ -76,6 +97,7 @@ private:
   void parseIncomingByte(uint8_t b);
   void handlePacket(uint8_t len, const uint8_t *payload);
   void sendRequest(uint8_t camera_id);
+  uint8_t mapProtocolVictimToInternal(uint8_t protocol_victim_id);
   const char *victimIdToName(uint8_t victim_id);
   void updateDisplaySplitScreen();
 };

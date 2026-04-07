@@ -16,29 +16,39 @@ from typing import Optional
 os.environ.setdefault("OPENCV_VIDEOIO_PRIORITY_OBSENSOR", "0")
 
 import cv2
+import numpy as np
 from ultralytics import YOLO
 
 import Constants
 from protocol import (
     CAM_LEFT,
     CAM_RIGHT,
+    VICTIM_HARMED,
     VICTIM_NONE,
     VICTIM_OMEGA,
     VICTIM_PHI,
     VICTIM_PSI,
+    VICTIM_STABLE,
+    VICTIM_UNHARMED,
 )
 
 
 def resolve_model_path() -> Path:
     base = Path(__file__).resolve().parent
-    onnx_path = base / "weights" / "best.onnx"
+    final_pt_path = base / "weights" / "modelo_robocup_final.pt"
+    maze_pt_path = base / "weights" / "best_maze_model.pt"
     pt_path = base / "weights" / "best.pt"
+    onnx_path = base / "weights" / "best.onnx"
+    if final_pt_path.exists():
+        return final_pt_path
+    if maze_pt_path.exists():
+        return maze_pt_path
     if pt_path.exists():
         return pt_path
     if onnx_path.exists():
         return onnx_path
     raise FileNotFoundError(
-        "No model found in Vision/weights (expected best.onnx or best.pt)"
+        "No model found in Vision/weights (expected modelo_robocup_final.pt, best_maze_model.pt, best.pt or best.onnx)"
     )
 
 
@@ -46,6 +56,7 @@ class VisionDetector:
     def __init__(self) -> None:
         self.model_path = resolve_model_path()
         self.model = YOLO(str(self.model_path))
+        self._target_detector = None
         self.conf = getattr(Constants, "vision_conf_threshold", 0.45)
         self.imgsz = getattr(Constants, "vision_imgsz", 640)
         self.iou = getattr(Constants, "vision_iou_threshold", 0.50)
@@ -56,24 +67,132 @@ class VisionDetector:
         self.inference_timeout_ms = int(
             getattr(Constants, "vision_inference_timeout_ms", 180)
         )
+        self.target_class_keywords = tuple(
+            str(keyword).strip().lower()
+            for keyword in getattr(
+                Constants,
+                "vision_target_class_keywords",
+                ["target", "bullseye"],
+            )
+        )
+        self.target_crop_pad_ratio = float(
+            getattr(Constants, "vision_target_crop_pad_ratio", 0.12)
+        )
+        self.target_conf_threshold = float(
+            getattr(Constants, "vision_target_conf_threshold", self.conf)
+        )
+        self.letter_conf_threshold = float(
+            getattr(Constants, "vision_letter_conf_threshold", self.conf)
+        )
+        self.force_frame_size = bool(
+            getattr(Constants, "vision_force_frame_size", False)
+        )
         self.frame_width = getattr(Constants, "vision_frame_width", 640)
         self.frame_height = getattr(Constants, "vision_frame_height", 480)
+        self.picamera_width = int(getattr(Constants, "vision_picamera_width", 1640))
+        self.picamera_height = int(getattr(Constants, "vision_picamera_height", 1232))
+        self.picamera_right_width = int(
+            getattr(Constants, "vision_picamera_right_width", self.picamera_width)
+        )
+        self.picamera_right_height = int(
+            getattr(Constants, "vision_picamera_right_height", self.picamera_height)
+        )
+        self.picamera_left_width = int(
+            getattr(Constants, "vision_picamera_left_width", self.picamera_width)
+        )
+        self.picamera_left_height = int(
+            getattr(Constants, "vision_picamera_left_height", self.picamera_height)
+        )
+        self.picamera_prefer_full_fov = bool(
+            getattr(Constants, "vision_picamera_prefer_full_fov", True)
+        )
+        self.picamera_main_format = str(
+            getattr(Constants, "vision_picamera_main_format", "RGB888")
+        )
+        self.picamera_color_order = (
+            str(getattr(Constants, "vision_picamera_color_order", "BGR"))
+            .strip()
+            .upper()
+        )
+        self.picamera_tuning_file = str(
+            getattr(Constants, "vision_picamera_tuning_file", "")
+        ).strip()
+        self.right_gain_b = float(getattr(Constants, "vision_right_gain_b", 1.0))
+        self.right_gain_g = float(getattr(Constants, "vision_right_gain_g", 1.0))
+        self.right_gain_r = float(getattr(Constants, "vision_right_gain_r", 1.0))
+        self.left_gain_b = float(getattr(Constants, "vision_left_gain_b", 1.0))
+        self.left_gain_g = float(getattr(Constants, "vision_left_gain_g", 1.0))
+        self.left_gain_r = float(getattr(Constants, "vision_left_gain_r", 1.0))
+        self.right_hue_shift = float(getattr(Constants, "vision_right_hue_shift", 0.0))
+        self.left_hue_shift = float(getattr(Constants, "vision_left_hue_shift", 0.0))
+        self.right_sat_scale = float(
+            getattr(Constants, "vision_right_saturation_scale", 1.0)
+        )
+        self.left_sat_scale = float(
+            getattr(Constants, "vision_left_saturation_scale", 1.0)
+        )
+        self.picamera_right_idx = int(
+            getattr(Constants, "vision_picamera_right_index", 0)
+        )
+        self.picamera_left_idx = int(
+            getattr(Constants, "vision_picamera_left_index", 1)
+        )
+        self.prefer_picamera2 = bool(
+            getattr(Constants, "vision_prefer_picamera2", True)
+        )
+        self.disable_opencv_fallback_when_picamera_preferred = bool(
+            getattr(
+                Constants,
+                "vision_disable_opencv_fallback_when_picamera_preferred",
+                True,
+            )
+        )
 
         self.cam_right_idx = getattr(Constants, "camera_right_index", 0)
         self.cam_left_idx = getattr(Constants, "camera_left_index", 1)
 
-        self.cap_right = self._open_capture(self.cam_right_idx)
-        self.cap_left = self._open_capture(self.cam_left_idx)
-        self._configure_capture(self.cap_right)
-        self._configure_capture(self.cap_left)
-
         self.picam_right = None
         self.picam_left = None
+        self.block_opencv_right = False
+        self.block_opencv_left = False
 
-        if not self.cap_right.isOpened() or not self.cap_left.isOpened():
+        self.cap_right = cv2.VideoCapture()
+        self.cap_left = cv2.VideoCapture()
+
+        if self.prefer_picamera2:
+            self.picam_right = self._init_picamera(self.picamera_right_idx, "right")
+            self.picam_left = self._init_picamera(self.picamera_left_idx, "left")
+
+            if (
+                self.disable_opencv_fallback_when_picamera_preferred
+                and self.picam_right is None
+            ):
+                self.block_opencv_right = True
+            if (
+                self.disable_opencv_fallback_when_picamera_preferred
+                and self.picam_left is None
+            ):
+                self.block_opencv_left = True
+
+        if self.picam_right is None and not self.block_opencv_right:
+            self.cap_right = self._open_capture(self.cam_right_idx)
+            self._configure_capture(self.cap_right)
+        if self.picam_left is None and not self.block_opencv_left:
+            self.cap_left = self._open_capture(self.cam_left_idx)
+            self._configure_capture(self.cap_left)
+
+        if (
+            (self.picam_right is None and not self.block_opencv_right)
+            or (self.picam_left is None and not self.block_opencv_left)
+        ) and (not self.cap_right.isOpened() or not self.cap_left.isOpened()):
             self._autodetect_cameras()
 
-        if not self.cap_right.isOpened() and not self.cap_left.isOpened():
+        if (
+            self.picam_right is None
+            and self.picam_left is None
+            and not self.cap_right.isOpened()
+            and not self.cap_left.isOpened()
+        ):
             raise RuntimeError("Could not open any camera (RIGHT/LEFT)")
 
         print(
@@ -81,8 +200,39 @@ class VisionDetector:
             f"imgsz={self.imgsz} device={self.device} frames={self.inference_frames}"
         )
         print(
-            f"[VISION] RIGHT idx={self.cam_right_idx} open={self.cap_right.isOpened()} | "
-            f"LEFT idx={self.cam_left_idx} open={self.cap_left.isOpened()}"
+            f"[VISION] force_frame_size={self.force_frame_size} "
+            f"target_size={self.frame_width}x{self.frame_height}"
+        )
+        print(
+            f"[VISION] picamera_prefer_full_fov={self.picamera_prefer_full_fov} "
+            f"picamera_size={self.picamera_width}x{self.picamera_height} "
+            f"format={self.picamera_main_format}"
+        )
+        print(f"[VISION] picamera_color_order={self.picamera_color_order}")
+        print(f"[VISION] picamera_tuning_file={self.picamera_tuning_file or 'default'}")
+        print(
+            f"[VISION] right_color gain(B,G,R)=({self.right_gain_b:.2f},{self.right_gain_g:.2f},{self.right_gain_r:.2f}) "
+            f"hue_shift={self.right_hue_shift:.2f} sat_scale={self.right_sat_scale:.2f}"
+        )
+        print(
+            f"[VISION] left_color gain(B,G,R)=({self.left_gain_b:.2f},{self.left_gain_g:.2f},{self.left_gain_r:.2f}) "
+            f"hue_shift={self.left_hue_shift:.2f} sat_scale={self.left_sat_scale:.2f}"
+        )
+        print(
+            f"[VISION] picamera_size_by_cam RIGHT={self.picamera_right_width}x{self.picamera_right_height} "
+            f"LEFT={self.picamera_left_width}x{self.picamera_left_height}"
+        )
+        print(
+            f"[VISION] picamera_map RIGHT={self.picamera_right_idx} "
+            f"LEFT={self.picamera_left_idx}"
+        )
+        print(f"[VISION] prefer_picamera2={self.prefer_picamera2}")
+        print(
+            f"[VISION] RIGHT idx={self.cam_right_idx} open={self.cap_right.isOpened()} picam={self.picam_right is not None} | "
+            f"LEFT idx={self.cam_left_idx} open={self.cap_left.isOpened()} picam={self.picam_left is not None}"
+        )
+        print(
+            f"[VISION] block_opencv_fallback RIGHT={self.block_opencv_right} LEFT={self.block_opencv_left}"
         )
         names = getattr(self.model, "names", None)
         if isinstance(names, dict):
@@ -92,16 +242,60 @@ class VisionDetector:
         self._activate_picamera2_if_needed()
         self._check_camera_reads()
 
-    def _init_picamera(self, camera_num: int):
+    @staticmethod
+    def _decode_fourcc(value: float) -> str:
+        code = int(value)
+        return "".join(chr((code >> (8 * i)) & 0xFF) for i in range(4)).strip("\x00")
+
+    def _log_capture_info(self, cap: Optional[cv2.VideoCapture], label: str) -> None:
+        if cap is None or not cap.isOpened():
+            print(f"[VISION] {label}: capture not opened")
+            return
+
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        fps = float(cap.get(cv2.CAP_PROP_FPS))
+        fourcc = self._decode_fourcc(cap.get(cv2.CAP_PROP_FOURCC))
+
+        backend_name = "UNKNOWN"
+        get_backend_name = getattr(cap, "getBackendName", None)
+        if callable(get_backend_name):
+            try:
+                backend_name = get_backend_name()
+            except Exception:
+                backend_name = "UNKNOWN"
+
+        print(
+            f"[VISION] {label}: backend={backend_name} "
+            f"size={width}x{height} fps={fps:.2f} fourcc={fourcc or 'N/A'}"
+        )
+
+    def _init_picamera(self, camera_num: int, side: str = "right"):
         try:
             Picamera2 = importlib.import_module("picamera2").Picamera2
         except Exception:
             return None
         try:
-            picam = Picamera2(camera_num)
-            config = picam.create_preview_configuration(
-                main={"size": (self.frame_width, self.frame_height)}
-            )
+            if self.picamera_tuning_file:
+                picam = Picamera2(camera_num, tuning=self.picamera_tuning_file)
+            else:
+                picam = Picamera2(camera_num)
+            if side == "left":
+                desired_width = self.picamera_left_width
+                desired_height = self.picamera_left_height
+            else:
+                desired_width = self.picamera_right_width
+                desired_height = self.picamera_right_height
+
+            main_config = {"format": self.picamera_main_format}
+            if self.force_frame_size:
+                main_config["size"] = (self.frame_width, self.frame_height)
+                config = picam.create_preview_configuration(main=main_config)
+            elif self.picamera_prefer_full_fov:
+                main_config["size"] = (desired_width, desired_height)
+                config = picam.create_preview_configuration(main=main_config)
+            else:
+                config = picam.create_preview_configuration(main=main_config)
             picam.configure(config)
             self._apply_autofocus_controls(picam)
             picam.start()
@@ -109,6 +303,77 @@ class VisionDetector:
         except Exception as exc:
             print(f"[VISION] Picamera2 init failed for camera {camera_num}: {exc}")
             return None
+
+    def _to_bgr(self, frame):
+        if frame is None:
+            return None
+        if len(frame.shape) == 2:
+            return cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+        if len(frame.shape) == 3:
+            channels = frame.shape[2]
+            if channels == 3:
+                if self.picamera_color_order == "BGR":
+                    return frame
+                return cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+            if channels == 4:
+                if self.picamera_color_order == "BGR":
+                    return cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
+                return cv2.cvtColor(frame, cv2.COLOR_RGBA2BGR)
+        return frame
+
+    @staticmethod
+    def _apply_channel_gains(frame_bgr, gain_b: float, gain_g: float, gain_r: float):
+        if (
+            abs(gain_b - 1.0) < 1e-6
+            and abs(gain_g - 1.0) < 1e-6
+            and abs(gain_r - 1.0) < 1e-6
+        ):
+            return frame_bgr
+
+        frame_float = frame_bgr.astype(np.float32)
+        frame_float[..., 0] *= gain_b
+        frame_float[..., 1] *= gain_g
+        frame_float[..., 2] *= gain_r
+        np.clip(frame_float, 0, 255, out=frame_float)
+        return frame_float.astype(np.uint8)
+
+    @staticmethod
+    def _apply_hsv_tuning(frame_bgr, hue_shift: float, saturation_scale: float):
+        if abs(hue_shift) < 1e-6 and abs(saturation_scale - 1.0) < 1e-6:
+            return frame_bgr
+
+        hsv = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2HSV).astype(np.float32)
+        hsv[..., 0] = (hsv[..., 0] + hue_shift) % 180.0
+        hsv[..., 1] *= saturation_scale
+        np.clip(hsv[..., 1], 0, 255, out=hsv[..., 1])
+        hsv_u8 = hsv.astype(np.uint8)
+        return cv2.cvtColor(hsv_u8, cv2.COLOR_HSV2BGR)
+
+    def _apply_color_correction(self, frame_bgr, camera_id: int):
+        if camera_id == CAM_RIGHT:
+            corrected = self._apply_channel_gains(
+                frame_bgr,
+                self.right_gain_b,
+                self.right_gain_g,
+                self.right_gain_r,
+            )
+            return self._apply_hsv_tuning(
+                corrected,
+                self.right_hue_shift,
+                self.right_sat_scale,
+            )
+
+        corrected = self._apply_channel_gains(
+            frame_bgr,
+            self.left_gain_b,
+            self.left_gain_g,
+            self.left_gain_r,
+        )
+        return self._apply_hsv_tuning(
+            corrected,
+            self.left_hue_shift,
+            self.left_sat_scale,
+        )
 
     def _apply_autofocus_controls(self, picam) -> None:
         mode_name = (
@@ -139,15 +404,26 @@ class VisionDetector:
             print(f"[VISION] autofocus config skipped: {exc}")
 
     def _activate_picamera2_if_needed(self) -> None:
+        if (
+            self.prefer_picamera2
+            and self.picam_right is not None
+            and self.picam_left is not None
+        ):
+            return
+
         right_ok = self._can_read_once(self.cap_right)
         left_ok = self._can_read_once(self.cap_left)
 
-        if right_ok and left_ok:
-            return
+        if not right_ok or not left_ok:
+            self._autodetect_readable_cameras()
+            right_ok = self._can_read_once(self.cap_right)
+            left_ok = self._can_read_once(self.cap_left)
 
         try:
             importlib.import_module("picamera2")
         except Exception:
+            if right_ok and left_ok:
+                return
             print(
                 "[VISION] Picamera2 not available. Install with: sudo apt install -y python3-picamera2"
             )
@@ -157,10 +433,96 @@ class VisionDetector:
             "[VISION] Switching to Picamera2 backend for cameras that fail with OpenCV..."
         )
 
+        camera_count = 0
+        camera_info = []
+        try:
+            Picamera2 = importlib.import_module("picamera2").Picamera2
+            camera_info = list(Picamera2.global_camera_info())
+            camera_count = len(camera_info)
+        except Exception:
+            camera_count = 0
+        print(f"[VISION] picamera2 available cameras={camera_count}")
+        for idx, info in enumerate(camera_info):
+            model = (
+                info.get("Model", "unknown") if isinstance(info, dict) else str(info)
+            )
+            print(f"[VISION] picamera2[{idx}] model={model}")
+
+        preferred_right = self.picamera_right_idx
+        preferred_left = self.picamera_left_idx
+
+        if preferred_right < 0:
+            preferred_right = 0
+        if preferred_left < 0:
+            preferred_left = 1 if camera_count > 1 else 0
+
+        if preferred_left == preferred_right:
+            preferred_left = 1 if preferred_right == 0 else 0
+
+        # Always try the configured Picamera2 indices first.
+        # This is the reliable path for two Camera Module 3 devices, because
+        # OpenCV/V4L2 can collapse both CSI cameras into the same index.
+        if self.picam_right is None:
+            self.picam_right = self._init_picamera(preferred_right, "right")
+            if self.picam_right is not None:
+                self.block_opencv_right = False
+        if self.picam_left is None:
+            self.picam_left = self._init_picamera(preferred_left, "left")
+            if self.picam_left is not None:
+                self.block_opencv_left = False
+
+        if self.picam_right is None and right_ok:
+            print("[VISION] RIGHT will keep using OpenCV fallback")
+        if self.picam_left is None and left_ok:
+            print("[VISION] LEFT will keep using OpenCV fallback")
+
+    def _autodetect_readable_cameras(self) -> None:
+        readable = []
+        for index in range(0, 8):
+            cap = self._open_capture(index)
+            if cap.isOpened():
+                ok, frame = cap.read()
+                if ok and frame is not None:
+                    readable.append(index)
+            cap.release()
+
+        if not readable:
+            print("[VISION] No readable OpenCV cameras found during re-scan")
+            return
+
+        right_ok = self._can_read_once(self.cap_right)
+        left_ok = self._can_read_once(self.cap_left)
+
         if not right_ok:
-            self.picam_right = self._init_picamera(0)
+            new_right = readable[0]
+            if self.cap_right is not None:
+                self.cap_right.release()
+            self.cam_right_idx = new_right
+            self.cap_right = self._open_capture(self.cam_right_idx)
+            self._configure_capture(self.cap_right)
+            print(
+                f"[VISION] RIGHT reassigned to readable OpenCV index={self.cam_right_idx}"
+            )
+
+        used_idx = self.cam_right_idx if self._can_read_once(self.cap_right) else None
+        left_candidates = [idx for idx in readable if idx != used_idx]
+
         if not left_ok:
-            self.picam_left = self._init_picamera(1)
+            if left_candidates:
+                new_left = left_candidates[0]
+                if self.cap_left is not None:
+                    self.cap_left.release()
+                self.cam_left_idx = new_left
+                self.cap_left = self._open_capture(self.cam_left_idx)
+                self._configure_capture(self.cap_left)
+                print(
+                    f"[VISION] LEFT reassigned to readable OpenCV index={self.cam_left_idx}"
+                )
+            else:
+                if self.cap_left is not None:
+                    self.cap_left.release()
+                self.cap_left = cv2.VideoCapture()
+                print("[VISION] No second readable OpenCV camera for LEFT")
 
     def _can_read_once(self, cap: Optional[cv2.VideoCapture]) -> bool:
         if cap is None or not cap.isOpened():
@@ -173,27 +535,40 @@ class VisionDetector:
             if cap is None or not cap.isOpened():
                 print(f"[VISION] {label}: not opened")
                 return
+            self._log_capture_info(cap, label)
             ok_count = 0
+            first_shape = None
             for _ in range(5):
                 cv2.waitKey(1)
                 ok, frame = cap.read()
                 if ok and frame is not None:
                     ok_count += 1
+                    if first_shape is None:
+                        first_shape = frame.shape[:2]
             print(f"[VISION] {label}: warmup_reads_ok={ok_count}/5")
+            if first_shape is not None:
+                h, w = first_shape
+                print(f"[VISION] {label}: first_frame_shape={w}x{h}")
 
         def test_picam(picam, label: str) -> None:
             if picam is None:
                 print(f"[VISION] {label}: not opened")
                 return
             ok_count = 0
+            first_shape = None
             for _ in range(5):
                 try:
                     frame = picam.capture_array()
                     if frame is not None:
                         ok_count += 1
+                        if first_shape is None:
+                            first_shape = frame.shape[:2]
                 except Exception:
                     pass
             print(f"[VISION] {label}: warmup_reads_ok={ok_count}/5")
+            if first_shape is not None:
+                h, w = first_shape
+                print(f"[VISION] {label}: first_frame_shape={w}x{h}")
 
         test_cap(self.cap_right, f"RIGHT(idx={self.cam_right_idx})")
         test_cap(self.cap_left, f"LEFT(idx={self.cam_left_idx})")
@@ -221,12 +596,18 @@ class VisionDetector:
 
         if not self.cap_left.isOpened():
             self.cap_left.release()
-            if len(available) > 1:
-                self.cam_left_idx = available[1]
+            used_idx = self.cam_right_idx if self.cap_right.isOpened() else None
+            left_candidates = [idx for idx in available if idx != used_idx]
+            if left_candidates:
+                self.cam_left_idx = left_candidates[0]
+                self.cap_left = self._open_capture(self.cam_left_idx)
+                self._configure_capture(self.cap_left)
             else:
-                self.cam_left_idx = available[0]
-            self.cap_left = self._open_capture(self.cam_left_idx)
-            self._configure_capture(self.cap_left)
+                # Keep LEFT unopened so Picamera2 fallback can be assigned there.
+                self.cap_left = cv2.VideoCapture()
+                print(
+                    "[VISION] No distinct OpenCV index left for LEFT; waiting for Picamera2 fallback"
+                )
 
     def _open_capture(self, index: int) -> cv2.VideoCapture:
         cap = cv2.VideoCapture(index, cv2.CAP_V4L2)
@@ -236,7 +617,7 @@ class VisionDetector:
         return cap
 
     def _configure_capture(self, cap: cv2.VideoCapture) -> None:
-        if cap is None:
+        if cap is None or not self.force_frame_size:
             return
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.frame_width)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.frame_height)
@@ -262,9 +643,13 @@ class VisionDetector:
             try:
                 frame = self.picam_right.capture_array()
                 if frame is not None:
-                    return True, cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                    frame_bgr = self._to_bgr(frame)
+                    if frame_bgr is not None:
+                        return True, self._apply_color_correction(frame_bgr, CAM_RIGHT)
             except Exception:
                 pass
+            if self.block_opencv_right:
+                return False, None
             if self.cap_right is not None:
                 return self.cap_right.read()
             return False, None
@@ -273,9 +658,13 @@ class VisionDetector:
             try:
                 frame = self.picam_left.capture_array()
                 if frame is not None:
-                    return True, cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                    frame_bgr = self._to_bgr(frame)
+                    if frame_bgr is not None:
+                        return True, self._apply_color_correction(frame_bgr, CAM_LEFT)
             except Exception:
                 pass
+        if self.block_opencv_left:
+            return False, None
         if self.cap_left is not None:
             return self.cap_left.read()
         return False, None
@@ -292,9 +681,102 @@ class VisionDetector:
         print(f"[VISION] unmapped class='{class_name}' -> NONE")
         return VICTIM_NONE
 
+    def _is_target_class(self, class_name: str) -> bool:
+        text = class_name.strip().lower()
+        if not text:
+            return False
+        return any(
+            keyword and keyword in text for keyword in self.target_class_keywords
+        )
+
+    @staticmethod
+    def _crop_bbox(frame, bbox, pad_ratio: float):
+        h_img, w_img = frame.shape[:2]
+        x1, y1, x2, y2 = bbox
+        box_w = max(1, x2 - x1)
+        box_h = max(1, y2 - y1)
+        pad = int(min(box_w, box_h) * max(0.0, pad_ratio))
+        rx1 = max(0, x1 - pad)
+        ry1 = max(0, y1 - pad)
+        rx2 = min(w_img, x2 + pad)
+        ry2 = min(h_img, y2 + pad)
+        roi = frame[ry1:ry2, rx1:rx2]
+        return roi, (rx1, ry1, rx2, ry2)
+
+    def _run_model(self, frame):
+        results = self.model.predict(
+            frame,
+            conf=self.conf,
+            iou=self.iou,
+            imgsz=self.imgsz,
+            device=self.device,
+            verbose=False,
+        )
+        if not results:
+            return None
+        return results[0]
+
+    def _extract_best_candidates(self, result):
+        boxes = result.boxes
+        names = result.names
+        if boxes is None or len(boxes) == 0:
+            return None, None
+
+        best_letter = None
+        best_target = None
+
+        for index in range(len(boxes)):
+            conf = float(boxes.conf[index].item())
+            class_id = int(boxes.cls[index].item())
+            class_name = (
+                names.get(class_id, str(class_id))
+                if isinstance(names, dict)
+                else str(class_id)
+            )
+            mapped_letter = self._class_to_victim_id(class_name)
+
+            if mapped_letter != VICTIM_NONE and conf >= self.letter_conf_threshold:
+                if best_letter is None or conf > best_letter["conf"]:
+                    best_letter = {
+                        "victim_id": mapped_letter,
+                        "class_name": class_name,
+                        "conf": conf,
+                    }
+
+            if self._is_target_class(class_name) and conf >= self.target_conf_threshold:
+                x1, y1, x2, y2 = map(int, boxes.xyxy[index].tolist())
+                if x2 <= x1 or y2 <= y1:
+                    continue
+                if best_target is None or conf > best_target["conf"]:
+                    best_target = {
+                        "bbox": (x1, y1, x2, y2),
+                        "class_name": class_name,
+                        "conf": conf,
+                    }
+
+        return best_letter, best_target
+
+    def _victim_id_from_target_roi(self, frame, camera_id: int, target_bbox):
+        roi, _ = self._crop_bbox(frame, target_bbox, self.target_crop_pad_ratio)
+        if roi is None or roi.size == 0:
+            return VICTIM_NONE
+
+        try:
+            from target_detector import TargetDetector, detect_bullseye_frame
+
+            analysis = detect_bullseye_frame(
+                roi,
+                model=None,
+                yolo_conf=self.conf,
+                label_history=None,
+                camera_id=camera_id,
+            )
+            return TargetDetector.victim_id_from_result(analysis)
+        except Exception as exc:
+            print(f"[VISION] target ROI analysis failed: {exc}")
+            return VICTIM_NONE
+
     def detect_victim(self, camera_id: int) -> int:
-        best_conf_global = -1.0
-        best_class_name = None
         started = time.monotonic()
 
         for _ in range(self.inference_frames):
@@ -306,46 +788,85 @@ class VisionDetector:
             if not ok or frame is None:
                 continue
 
-            results = self.model.predict(
-                frame,
-                conf=self.conf,
-                iou=self.iou,
-                imgsz=self.imgsz,
-                device=self.device,
-                verbose=False,
-            )
-            if not results:
+            result = self._run_model(frame)
+            if result is None:
                 continue
 
-            result = results[0]
-            boxes = result.boxes
-            names = result.names
-            if boxes is None or len(boxes) == 0:
-                continue
+            best_letter, _ = self._extract_best_candidates(result)
+            if best_letter is not None:
+                print(
+                    f"[VISION] top_letter={best_letter['class_name']} conf={best_letter['conf']:.3f}"
+                )
+                return int(best_letter["victim_id"])
 
-            best_idx = int(boxes.conf.argmax().item())
-            best_conf = float(boxes.conf[best_idx].item())
-            class_id = int(boxes.cls[best_idx].item())
-            class_name = (
-                names.get(class_id, str(class_id))
-                if isinstance(names, dict)
-                else str(class_id)
-            )
+        print(
+            f"[VISION] no letter detections cam={'RIGHT' if camera_id == CAM_RIGHT else 'LEFT'}"
+        )
+        return VICTIM_NONE
 
-            mapped = self._class_to_victim_id(class_name)
-            if mapped != VICTIM_NONE:
-                print(f"[VISION] top_class={class_name} conf={best_conf:.3f}")
-                return mapped
-
-            if best_conf > best_conf_global:
-                best_conf_global = best_conf
-                best_class_name = class_name
-
-        if best_class_name is None:
-            print(
-                f"[VISION] no detections cam={'RIGHT' if camera_id == CAM_RIGHT else 'LEFT'}"
-            )
+    def detect_combined(self, camera_id: int) -> int:
+        ok, frame = self.read_frame(camera_id)
+        if not ok or frame is None:
             return VICTIM_NONE
 
-        print(f"[VISION] top_class={best_class_name} conf={best_conf_global:.3f}")
-        return self._class_to_victim_id(best_class_name)
+        result = self._run_model(frame)
+        if result is None:
+            return VICTIM_NONE
+
+        best_letter, best_target = self._extract_best_candidates(result)
+        if best_target is not None:
+            target_victim_id = self._victim_id_from_target_roi(
+                frame,
+                camera_id,
+                best_target["bbox"],
+            )
+            if target_victim_id in (VICTIM_HARMED, VICTIM_STABLE, VICTIM_UNHARMED):
+                print(
+                    f"[VISION] target_class={best_target['class_name']} conf={best_target['conf']:.3f}"
+                )
+                return target_victim_id
+
+        if best_letter is not None:
+            return int(best_letter["victim_id"])
+
+        return VICTIM_NONE
+
+    def detect_target(self, camera_id: int):
+        """Detect a bullseye target with unified model first, dedicated model fallback."""
+        ok, frame = self.read_frame(camera_id)
+        if not ok or frame is None:
+            cam_name = "RIGHT" if camera_id == CAM_RIGHT else "LEFT"
+            print(f"[VISION] no frame available for {cam_name} target detection")
+            return None
+
+        result = self._run_model(frame)
+        if result is not None:
+            _, best_target = self._extract_best_candidates(result)
+            if best_target is not None:
+                roi, _ = self._crop_bbox(
+                    frame, best_target["bbox"], self.target_crop_pad_ratio
+                )
+                if roi is not None and roi.size > 0:
+                    try:
+                        from target_detector import detect_bullseye_frame
+
+                        return detect_bullseye_frame(
+                            roi,
+                            model=None,
+                            yolo_conf=self.conf,
+                            label_history=None,
+                            camera_id=camera_id,
+                        )
+                    except Exception as exc:
+                        print(f"[VISION] unified target analysis failed: {exc}")
+
+        if self._target_detector is None:
+            try:
+                from target_detector import TargetDetector
+
+                self._target_detector = TargetDetector()
+            except Exception as exc:
+                print(f"[VISION] target fallback detector unavailable: {exc}")
+                return None
+
+        return self._target_detector.detect_frame(frame)

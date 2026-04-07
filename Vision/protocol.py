@@ -20,6 +20,10 @@ VICTIM_NONE = 0
 VICTIM_PHI = 1
 VICTIM_PSI = 2
 VICTIM_OMEGA = 3
+VICTIM_HARMED = 4
+VICTIM_UNHARMED = 5
+VICTIM_STABLE = 6
+VICTIM_FAKE_TARGET = 7
 
 
 @dataclass
@@ -87,6 +91,10 @@ def victim_name(victim_id: int) -> str:
         VICTIM_PHI: "PHI",
         VICTIM_PSI: "PSI",
         VICTIM_OMEGA: "OMEGA",
+        VICTIM_HARMED: "HARMED",
+        VICTIM_UNHARMED: "UNHARMED",
+        VICTIM_STABLE: "STABLE",
+        VICTIM_FAKE_TARGET: "FAKE_TARGET",
     }.get(victim_id, "UNKNOWN")
 
 
@@ -100,6 +108,61 @@ def build_vision_packet(camera_id: int, victim_id: int) -> bytes:
     return struct.pack(
         "BBBBBB", HEADER0, HEADER1, payload_len, camera_id, victim_id, checksum
     )
+
+
+def build_victim_packet(camera_id: int, victim_id: int) -> bytes:
+    return build_vision_packet(camera_id, victim_id)
+
+
+def build_none_packet(camera_id: int) -> bytes:
+    return build_victim_packet(camera_id, VICTIM_NONE)
+
+
+def build_phi_packet(camera_id: int) -> bytes:
+    return build_victim_packet(camera_id, VICTIM_PHI)
+
+
+def build_psi_packet(camera_id: int) -> bytes:
+    return build_victim_packet(camera_id, VICTIM_PSI)
+
+
+def build_omega_packet(camera_id: int) -> bytes:
+    return build_victim_packet(camera_id, VICTIM_OMEGA)
+
+
+def build_harmed_packet(camera_id: int) -> bytes:
+    return build_victim_packet(camera_id, VICTIM_HARMED)
+
+
+def build_unharmed_packet(camera_id: int) -> bytes:
+    return build_victim_packet(camera_id, VICTIM_UNHARMED)
+
+
+def build_stable_packet(camera_id: int) -> bytes:
+    return build_victim_packet(camera_id, VICTIM_STABLE)
+
+
+def build_fake_target_packet(camera_id: int) -> bytes:
+    return build_victim_packet(camera_id, VICTIM_FAKE_TARGET)
+
+
+def build_victim_packet_for_name(camera_id: int, victim_id: int) -> bytes:
+    builders = {
+        VICTIM_NONE: build_none_packet,
+        VICTIM_PHI: build_phi_packet,
+        VICTIM_PSI: build_psi_packet,
+        VICTIM_OMEGA: build_omega_packet,
+        VICTIM_HARMED: build_harmed_packet,
+        VICTIM_UNHARMED: build_unharmed_packet,
+        VICTIM_STABLE: build_stable_packet,
+        VICTIM_FAKE_TARGET: build_fake_target_packet,
+    }
+    return builders.get(victim_id, build_none_packet)(camera_id)
+
+
+def rebuild_packet_bytes(packet: Packet) -> bytes:
+    checksum = (packet.payload_len + sum(packet.payload)) & 0xFF
+    return bytes([HEADER0, HEADER1, packet.payload_len, *packet.payload, checksum])
 
 
 def parse_detection_request(packet: Packet) -> Tuple[bool, int]:

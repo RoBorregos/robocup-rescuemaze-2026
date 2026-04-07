@@ -19,6 +19,7 @@ from protocol import (
     build_vision_packet,
     camera_name,
     parse_detection_request,
+    rebuild_packet_bytes,
     victim_name,
 )
 
@@ -65,6 +66,7 @@ class Esp32Service:
         packet = build_vision_packet(camera_id, victim_id)
         written = self.port.write(packet)
         self.port.flush()
+        print(f"[TX] {packet.hex(' ').upper()}")
         return written
 
     def listen_and_respond(self) -> None:
@@ -87,6 +89,9 @@ class Esp32Service:
                 packet = self.packet_reader.feed(byte_data[0])
                 if packet is None:
                     continue
+
+                raw_packet = rebuild_packet_bytes(packet)
+                print(f"[RX] {raw_packet.hex(' ').upper()}")
 
                 print(
                     f"[REQ] len={packet.payload_len} payload={[int(b) for b in packet.payload]}"

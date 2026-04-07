@@ -84,7 +84,7 @@ uint8_t Raspy::getDetection() {
   // DETECTION_MIN_CONSENSUS)
   uint8_t right_consensus = VICTIM_NONE;
   int max_count = 0;
-  for (uint8_t val = VICTIM_NONE; val <= VICTIM_OMEGA; val++) {
+  for (uint8_t val = VICTIM_NONE; val <= VICTIM_MAX_ID; val++) {
     int count = 0;
     for (int i = 0; i < DETECTION_ATTEMPTS; i++) {
       if (right_results[i] == val)
@@ -102,7 +102,7 @@ uint8_t Raspy::getDetection() {
   // DETECTION_MIN_CONSENSUS)
   uint8_t left_consensus = VICTIM_NONE;
   max_count = 0;
-  for (uint8_t val = VICTIM_NONE; val <= VICTIM_OMEGA; val++) {
+  for (uint8_t val = VICTIM_NONE; val <= VICTIM_MAX_ID; val++) {
     int count = 0;
     for (int i = 0; i < DETECTION_ATTEMPTS; i++) {
       if (left_results[i] == val)
@@ -143,7 +143,7 @@ void Raspy::handlePacket(uint8_t len, const uint8_t *payload) {
   }
 
   uint8_t cam_id = payload[0];
-  uint8_t victim_id = payload[1];
+  uint8_t protocol_victim_id = payload[1];
 
   // Validate camera ID
   if (cam_id != CAM_RIGHT && cam_id != CAM_LEFT) {
@@ -151,9 +151,11 @@ void Raspy::handlePacket(uint8_t len, const uint8_t *payload) {
   }
 
   // Validate victim ID
-  if (victim_id > VICTIM_OMEGA) {
+  if (protocol_victim_id > PROTO_VICTIM_MAX_ID) {
     return;
   }
+
+  uint8_t victim_id = mapProtocolVictimToInternal(protocol_victim_id);
 
   // Store detection data
   camera = cam_id;
@@ -161,14 +163,43 @@ void Raspy::handlePacket(uint8_t len, const uint8_t *payload) {
   packet_received = true;
 }
 
+uint8_t Raspy::mapProtocolVictimToInternal(uint8_t protocol_victim_id) {
+  switch (protocol_victim_id) {
+  case PROTO_VICTIM_PHI:
+    return VICTIM_LETTER_H;
+  case PROTO_VICTIM_PSI:
+    return VICTIM_LETTER_S;
+  case PROTO_VICTIM_OMEGA:
+    return VICTIM_LETTER_U;
+  case PROTO_VICTIM_HARMED:
+    return VICTIM_HARMED;
+  case PROTO_VICTIM_UNHARMED:
+    return VICTIM_UNHARMED;
+  case PROTO_VICTIM_STABLE:
+    return VICTIM_STABLE;
+  case PROTO_VICTIM_FAKE_TARGET:
+    return VICTIM_FAKE_TARGET;
+  default:
+    return VICTIM_NONE;
+  }
+}
+
 const char *Raspy::victimIdToName(uint8_t victim_id) {
   switch (victim_id) {
+  case VICTIM_HARMED:
+    return "HARMED";
+  case VICTIM_STABLE:
+    return "STABLE";
+  case VICTIM_UNHARMED:
+    return "UNHARMED";
   case VICTIM_PHI:
     return "PHI";
   case VICTIM_PSI:
     return "PSI";
   case VICTIM_OMEGA:
     return "OMEGA";
+  case VICTIM_FAKE_TARGET:
+    return "FAKE";
   default:
     return "NONE";
   }
