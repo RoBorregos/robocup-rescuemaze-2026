@@ -27,10 +27,6 @@ bool LimitSwitch::getState() {
     } else {
         state_ = false;
     }
-    if (val != currentVal) {
-        state_ = true;
-        Serial.println("LimitSwitch is active");
-    }
     return state_;
 }
 
