@@ -11,13 +11,19 @@ void motors::setupMotors() {
   delay(10);
   Wire.setClock(400000);
   screenBegin();
+  screenPrint("BNO NOT INITIALIZED");
   bno.setupBNO();
+  screenPrint("VLX 2 NOT INITIALIZED");
   setupVlx(vlxID::left);
+  screenPrint("VLX 0 NOT INITIALIZED");
   setupVlx(vlxID::frontRight);
+  screenPrint("VLX 4 NOT INITIALIZED");
   setupVlx(vlxID::right);
+  screenPrint("VLX 3 NOT INITIALIZED");
   setupVlx(vlxID::frontLeft);
+  screenPrint("VLX 1 NOT INITIALIZED");
   setupVlx(vlxID::back);
-  setupTCS();
+  //setupTCS();
   limitSwitch_[LimitSwitchID::kLeft].initLimitSwitch(Pins::limitSwitchPins[LimitSwitchID::kLeft]);
   limitSwitch_[LimitSwitchID::kRight].initLimitSwitch(Pins::limitSwitchPins[LimitSwitchID::kRight]);
   for (uint8_t i = 0; i < 4; i++) {
@@ -85,8 +91,8 @@ void motors::ahead() {
   if (abs(targetAngle_ - angle) >= minAngleToCorrect) {
     rotate(targetAngle_);
   }
-  passObstacle();
-  passObstacle(); // double verification (if obstacle still in the way rotate,
+  //passObstacle();
+  //passObstacle(); // double verification (if obstacle still in the way rotate,
                   // else, ignore)
   nearWall();
   resetTics();
@@ -151,7 +157,7 @@ void motors::ahead() {
           break;
       }
       if (rampCaution)
-        speed = map(missingDistance, kTileLength, 0, (kMaxSpeedFormard / 3),
+        speed = map(missingDistance, kTileLength, 0, (7),
                     kMinSpeedFormard);
       speed = constrain(speed, kMinSpeedFormard, kMaxSpeedFormard);
       pidEncoders(speed, true);
@@ -187,8 +193,7 @@ void motors::ahead() {
   stop();
   resetTics();
   // checkTileColor();
-  screenPrint(String (vlx[vlxID::right].getDistance())); //DONT DELETE
-  screenPrint(String (vlx[vlxID::left].getDistance())); //DONT DELETE
+  screenPrint(String (vlx[vlxID::right].getDistance()) + String (vlx[vlxID::left].getDistance())); 
 }
 
 void motors::checkTileColor() {
@@ -297,7 +302,7 @@ void motors::limitCrash(){
       moveDistance(kTileLength / 5, false);
       }
       if (leftState || rightState) {
-        float sideAngle = targetAngle + (leftState ? 25 : -25);
+        float sideAngle = targetAngle + (leftState ? 30 : -30);
         if (sideAngle >= 360)
           sideAngle -= 360;
         if (sideAngle < 0)
@@ -645,7 +650,7 @@ bool motors::isRamp() {
 void motors::ramp() {
   resetTics();
   setahead();
-  while (bno.getOrientationY() > 7) {
+  while (bno.getOrientationY()  > 7) {
     if (buttonPressed == true)
       break;
     limitCrash();
@@ -695,7 +700,7 @@ void motors::ramp() {
       pidEncoders(kSpeedRampDown, true);
     }
     rampState = 2;
-    // screenPrint("rampDown");
+    screenPrint("rampDown");
   }
   if (getAvergeTics() > 1 * kTicsPerTile && rampState == 1) {
     // stop();

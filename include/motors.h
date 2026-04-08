@@ -53,12 +53,12 @@ private:
   // Speeds constants
   uint16_t kMinSpeedRotate = 10;
   static constexpr uint16_t kMaxSpeedRotate = 30;
-  static constexpr uint16_t kMinSpeedFormard = 7;
+  static constexpr uint16_t kMinSpeedFormard = 12;
   static constexpr uint16_t kMaxSpeedFormard = 50;
   static constexpr uint16_t kSpeedRampUp = 20;
   static constexpr uint16_t kSpeedRampDown = 9;
-  static constexpr uint16_t kSpeedCorrection = 5;
-  static constexpr uint16_t kSpeedLeftCorrection = 3;
+  static constexpr uint16_t kSpeedCorrection = 0;
+  static constexpr uint16_t kSpeedLeftCorrection = 0;
   // ramp
   PID rampUpPID;
   PID rampDownPID;
