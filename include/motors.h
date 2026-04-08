@@ -38,8 +38,7 @@ private:
   static constexpr uint8_t maxVlxDistance = 68;
   static constexpr uint8_t brakingDis = 5;
   static constexpr uint8_t kDistanceToWall = 12;
-  static constexpr uint8_t kDistanceToObstacle =
-      kTileLength + 2; // look over a bit more than a tile
+  static constexpr uint8_t kDistanceToObstacle = 20;
   // wheels
   static constexpr float wheelDiameter = 7.5;
   static constexpr float distancePerRev = wheelDiameter * PI;
@@ -51,12 +50,14 @@ private:
   uint16_t kMinPwmFormard = 70;
   uint16_t kMaxPwmFormard = 180;
   // Speeds constants
-  static constexpr uint16_t kMinSpeedRotate = 7;
+  uint16_t kMinSpeedRotate = 10;
   static constexpr uint16_t kMaxSpeedRotate = 30;
-  static constexpr uint16_t kMinSpeedFormard = 5;
-  static constexpr uint16_t kMaxSpeedFormard = 40;
+  static constexpr uint16_t kMinSpeedFormard = 7;
+  static constexpr uint16_t kMaxSpeedFormard = 50;
   static constexpr uint16_t kSpeedRampUp = 20;
   static constexpr uint16_t kSpeedRampDown = 9;
+  static constexpr uint16_t kSpeedCorrection = 5;
+  static constexpr uint16_t kSpeedLeftCorrection = 3;
   // ramp
   PID rampUpPID;
   PID rampDownPID;
@@ -64,8 +65,10 @@ private:
   static constexpr float kMinRampOrientation = 18.0;
   // control Walls
   static constexpr float minDisToLateralWall = 6;
+  static constexpr float DisToSideWall = 20;
   float changeAngle = 0;
   static constexpr uint8_t maxChangeAngle = 3;
+  static constexpr uint8_t minAngleToCorrect = 10;
   // PID movement constants
   static constexpr float kP_mov = 1;
   static constexpr float kI_mov = 0.00;
