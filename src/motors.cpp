@@ -91,8 +91,8 @@ void motors::ahead() {
   if (abs(targetAngle_ - angle) >= minAngleToCorrect) {
     rotate(targetAngle_);
   }
-  //passObstacle();
-  //passObstacle(); // double verification (if obstacle still in the way rotate,
+  passObstacle();
+  passObstacle(); // double verification (if obstacle still in the way rotate,
                   // else, ignore)
   nearWall();
   resetTics();
@@ -120,8 +120,6 @@ void motors::ahead() {
 
   String print = static_cast<String>(frontDistance);
   // robot.screenPrint(print);
-  if (frontDistance > 800)
-    rampCaution = true;
   if (abs(bno.getOrientationY()) > 15) {
     encoder = true;
     offset = kTicsPerTile / 6;
@@ -156,9 +154,6 @@ void motors::ahead() {
         if (getAvergeTics() > kTicsPerTile)
           break;
       }
-      if (rampCaution)
-        speed = map(missingDistance, kTileLength, 0, (7),
-                    kMinSpeedFormard);
       speed = constrain(speed, kMinSpeedFormard, kMaxSpeedFormard);
       pidEncoders(speed, true);
     }
@@ -178,9 +173,6 @@ void motors::ahead() {
       float speed = map(missingDistance, kTileLength, 0, kMaxSpeedFormard,
                         kMinSpeedFormard);
       speed = constrain(speed, kMinSpeedFormard, kMaxSpeedFormard);
-      if (rampCaution)
-        speed = map(missingDistance, kTileLength, 0, (kMaxSpeedFormard / 2),
-                    kMinSpeedFormard);
       pidEncoders(speed, true);
     }
   }
@@ -650,7 +642,7 @@ bool motors::isRamp() {
 void motors::ramp() {
   resetTics();
   setahead();
-  while (bno.getOrientationY()  > 7) {
+  while (bno.getOrientationY()  < -7) {
     if (buttonPressed == true)
       break;
     limitCrash();
@@ -677,7 +669,7 @@ void motors::ramp() {
     rampState = 1;
     screenPrint("rampUp");
   }
-  while (bno.getOrientationY() < -7) {
+  while (bno.getOrientationY() > 7) {
     if (buttonPressed == true)
       break;
     limitCrash();
@@ -689,15 +681,15 @@ void motors::ramp() {
     if ((vlx[vlxID::right].distance < vlx[vlxID::right].kDistanceToWall &&
          vlx[vlxID::left].distance < vlx[vlxID::left].kDistanceToWall) &&
         (vlx[vlxID::right].distance < 6 || vlx[vlxID::left].distance < 6)) {
-      error = rampDownPID.calculate_PID(
+      error = rampUpPID.calculate_PID(
           0, (vlx[vlxID::right].distance - vlx[vlxID::left].distance));
-      error = constrain(error, -6, 6);
-      PID_Wheel(kSpeedRampDown - error, MotorID::kFrontLeft);
-      PID_Wheel(kSpeedRampDown - error, MotorID::kBackLeft);
-      PID_Wheel(kSpeedRampDown + error, MotorID::kFrontRight);
-      PID_Wheel(kSpeedRampDown + error, MotorID::kBackRight);
+      error = constrain(error, -15, 15);
+      PID_Wheel(kSpeedRampUp - error, MotorID::kFrontLeft);
+      PID_Wheel(kSpeedRampUp - error, MotorID::kBackLeft);
+      PID_Wheel(kSpeedRampUp + error, MotorID::kFrontRight);
+      PID_Wheel(kSpeedRampUp + error, MotorID::kBackRight);
     } else {
-      pidEncoders(kSpeedRampDown, true);
+      pidEncoders(kSpeedRampUp, true);
     }
     rampState = 2;
     screenPrint("rampDown");

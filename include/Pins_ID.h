@@ -30,7 +30,7 @@ constexpr uint8_t LedsPin = 12;
 
 } // namespace Pins
 namespace LimitSwitchID {
-constexpr uint8_t kLeft = 0;
+constexpr uint8_t kLeft = 0; 
 constexpr uint8_t kRight = 1;
 } // namespace LimitSwitchID
 
