@@ -1,6 +1,6 @@
 # robocup-rescuemaze-2026
 
-This repository contains the code of RoboRescue's autonomous robot designed to navigate and perform tasks in the RoboCup Rescue Maze 2026 competition.
+This repository contains the code of RoBorregos autonomous robot designed to navigate and perform tasks in the RoboCup Rescue Maze 2026 competition.
 
 ## Overview
 Our robot is designed to autonomously explore the maze using a Depth First Search (DFS) exploration strategy to systematically map the environment and detect dead ends. Once the maze structure is partially or fully discovered, Dijkstra’s algorithm is applied to compute the shortest paths between key points, optimizing return routes and reducing overall mission time. During navigation, the robot must detect and classify Greek letter victims using computer vision (YOLO), as well as identify cognitive targets composed of five colored concentric rings using HSV masks. The health status of each cognitive target is determined by summing the numerical values associated with the ring colors. This integrated approach combines autonomous exploration, path optimization, and visual recognition.
@@ -13,6 +13,14 @@ Our robot is designed to autonomously explore the maze using a Depth First Searc
 | Salette            |	    			NA					                | Mechanic	   |
 | Becca Gómez        |                  NA				                    | Electronic   |
 
+
+
+## Code Structure
+- `src/` - Source code for robot control and navigation
+- `Vision/` - All things realted to Vision detection 
+
+
+##
 This project follows the official rules of the RoboCup Junior Rescue Maze competition. The robot must:
 	•	Autonomously navigate an unknown maze
 	•	Detect and classify Greek letter victims 
@@ -22,15 +30,11 @@ This project follows the official rules of the RoboCup Junior Rescue Maze compet
 
 The health status of cognitive targets is calculated by summing the numerical values assigned to each of the five colored concentric rings.
 
-## Code Structure
-- `src/` - Source code for robot control and navigation
-- `Vision/` - All things realted to Vision detection 
 ## Setup Instructions
 1. Clone this repository: `git clone https://github.com/yourusername/robocup-rescuemaze-2026.git`
 2. Navigate to the project directory: `cd robocup-rescuemaze-2026`
 3. Install dependencies: `...`
 4. Run the main program: `...`
-
 
 ## Contact
 For any questions or further information, please contact us at:
