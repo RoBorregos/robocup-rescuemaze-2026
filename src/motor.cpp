@@ -38,12 +38,12 @@ void Motor::setSpeed(uint16_t velocity) {
   delay(1); // wait one milli (dont delate)
 }
 void Motor::ahead() {
-  digitalWrite(in1, 0);
-  digitalWrite(in2, 1);
-}
-void Motor::back() {
   digitalWrite(in1, 1);
   digitalWrite(in2, 0);
+}
+void Motor::back() {
+  digitalWrite(in1, 0);
+  digitalWrite(in2, 1);
 }
 void Motor::stop() {
   digitalWrite(in1, 1);
