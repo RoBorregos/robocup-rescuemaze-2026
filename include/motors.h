@@ -20,7 +20,7 @@
 #define PCA9548A_ADDR 0x70      // PCA9548A Direction
 #define PCA9548A_CHANNEL_4 0x20 // Canal 4 (SDA4/SCL4)
 
-constexpr uint8_t edgeTileDistance = 10;
+constexpr uint8_t edgeTileDistance = 9;
 constexpr uint8_t kTileLength = 30;
 constexpr uint8_t rulet[4][4] = {
     {0, 1, 2, 3}, {3, 0, 1, 2}, {2, 3, 0, 1}, {1, 2, 3, 0}};
@@ -54,7 +54,7 @@ private:
   uint16_t kMinSpeedRotate = 10;
   static constexpr uint16_t kMaxSpeedRotate = 30;
   static constexpr uint16_t kMinSpeedFormard = 12;
-  static constexpr uint16_t kMaxSpeedFormard = 50;
+  static constexpr uint16_t kMaxSpeedFormard = 40;
   static constexpr uint16_t kSpeedRampUp = 20;
   static constexpr uint16_t kSpeedRampDown = 9;
   static constexpr uint16_t kSpeedCorrection = 0;

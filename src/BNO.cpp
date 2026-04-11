@@ -39,7 +39,7 @@ float BNO::getOrientationX() {
 
 float BNO::getOrientationY() {
   updateBNO(event_);
-  return event_.orientation.z - phaseCorrectionY_;
+  return event_.orientation.y - phaseCorrectionY_;
 }
 
 void BNO::setPhaseCorrection(const float phaseCorrection) {
@@ -53,11 +53,11 @@ void BNO::setPhaseCorrectionY(float phaseCorrectionY) {
 void BNO::resetOrientation() {
   updateBNO(event_);
   setPhaseCorrection(event_.orientation.x);
-  setPhaseCorrectionY(event_.orientation.z);
+  setPhaseCorrectionY(event_.orientation.y);
   bno_.begin();
   delay(10);
   bno_.setExtCrystalUse(true);
-  Serial.println("Bno values set to 0 for X and z axis.");
+  Serial.println("Bno values set to 0 for X and Y axis.");
 }
 
 void BNO::resetOrientationX() {

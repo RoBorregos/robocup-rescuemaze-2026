@@ -13,15 +13,15 @@ void motors::setupMotors() {
   screenBegin();
   screenPrint("BNO NOT INITIALIZED");
   bno.setupBNO();
-  screenPrint("VLX 2 NOT INITIALIZED");
+  screenPrint("VLX " + String(vlxID::left) + " NOT INITIALIZED");
   setupVlx(vlxID::left);
-  screenPrint("VLX 0 NOT INITIALIZED");
+  screenPrint("VLX " + String(vlxID::frontRight) + " NOT INITIALIZED");
   setupVlx(vlxID::frontRight);
-  screenPrint("VLX 4 NOT INITIALIZED");
+  screenPrint("VLX " + String(vlxID::right) + " NOT INITIALIZED");
   setupVlx(vlxID::right);
-  screenPrint("VLX 3 NOT INITIALIZED");
+  screenPrint("VLX " + String(vlxID::frontLeft) + " NOT INITIALIZED");
   setupVlx(vlxID::frontLeft);
-  screenPrint("VLX 1 NOT INITIALIZED");
+  screenPrint("VLX " + String(vlxID::back) + " NOT INITIALIZED");
   setupVlx(vlxID::back);
   //setupTCS();
   limitSwitch_[LimitSwitchID::kLeft].initLimitSwitch(Pins::limitSwitchPins[LimitSwitchID::kLeft]);
@@ -80,10 +80,10 @@ void motors::pidEncoders(int speedReference, bool ahead) {
   AngleError = constrain(AngleError, -17, 17);
   if (!ahead)
     AngleError = -AngleError;
-  PID_Wheel(speedReference + kSpeedLeftCorrection + AngleError, MotorID::kFrontLeft);
-  PID_Wheel(speedReference + AngleError, MotorID::kBackLeft);
-  PID_Wheel(speedReference + kSpeedCorrection - AngleError, MotorID::kFrontRight);
+  PID_Wheel(speedReference - AngleError, MotorID::kFrontRight);
   PID_Wheel(speedReference - AngleError, MotorID::kBackRight);
+  PID_Wheel(speedReference + AngleError, MotorID::kFrontLeft);
+  PID_Wheel(speedReference + AngleError, MotorID::kBackLeft);
 }
 
 void motors::ahead() {
@@ -269,7 +269,7 @@ void motors::limitCrash(){
     bool leftState=limitSwitch_[LimitSwitchID::kLeft].getState();
     bool rightState=limitSwitch_[LimitSwitchID::kRight].getState();
     if (leftState || rightState) {
-      delay(50); // Debounce delay
+      delay(70); // Debounce delay
       if ((leftState != limitSwitch_[LimitSwitchID::kLeft].getState()) || //If states update within millis
           (rightState != limitSwitch_[LimitSwitchID::kRight].getState())) {
         leftState = limitSwitch_[LimitSwitchID::kLeft].getState();
@@ -285,16 +285,17 @@ void motors::limitCrash(){
       if (leftState && rightState) {
         if (vlx[vlxID::back].getDistance() > 20) {
         moveDistance(kTileLength / 3, false);
+        stop();
         }
         rotate(targetAngle_);
         limitColition = false;
         return;
       }
-      if (vlx[vlxID::back].getDistance() > 20) {
+
       moveDistance(kTileLength / 5, false);
-      }
+      
       if (leftState || rightState) {
-        float sideAngle = targetAngle + (leftState ? 30 : -30);
+        float sideAngle = targetAngle + (leftState ? 25 : -25);  
         if (sideAngle >= 360)
           sideAngle -= 360;
         if (sideAngle < 0)
@@ -409,9 +410,9 @@ float motors::changeSpeedMove(bool encoders, bool rotate, int targetDistance,
     missingAngle = abs(targetAngle - (targetAngle == 0 ? z_rotation : angle));
     speed = map(missingAngle, 90, 0, kMaxSpeedRotate, kMinSpeedRotate);
     speed = constrain(speed, kMinSpeedRotate, kMaxSpeedRotate);
-    PID_Wheel(speed + kSpeedLeftCorrection, MotorID::kFrontLeft);
-    PID_Wheel(speed, MotorID::kBackLeft);
-    PID_Wheel(speed + kSpeedCorrection, MotorID::kFrontRight);
+    PID_Wheel(speed + 10, MotorID::kFrontLeft);
+    PID_Wheel(speed - kSpeedLeftCorrection, MotorID::kBackLeft);
+    PID_Wheel(speed, MotorID::kFrontRight);
     PID_Wheel(speed, MotorID::kBackRight);
     return 0;
   } else {
@@ -690,7 +691,7 @@ void motors::ramp() {
       PID_Wheel(kSpeedRampUp + error, MotorID::kBackRight);
     } else {
       pidEncoders(kSpeedRampUp, true);
-    }
+    } 
     rampState = 2;
     screenPrint("rampDown");
   }

@@ -21,7 +21,7 @@ bool LimitSwitch::getState() {
     const uint8_t val = digitalRead(pin_);
     delayMicroseconds(1000); // 1ms (1000
     const uint8_t currentVal = digitalRead(pin_);
-    if (val == HIGH) {
+    if (val == LOW) {
         state_ = true;
         Serial.println("LimitSwitch is active");
     } else {
@@ -32,7 +32,7 @@ bool LimitSwitch::getState() {
 
 void LimitSwitch::LimitSwitchActive() {
     volatile bool val = digitalRead(pin_);
-    if (state_ == HIGH) {
+    if (state_ == LOW) {
         state_ = true;
         Serial.println("LimitSwitch is active");
     } else {
