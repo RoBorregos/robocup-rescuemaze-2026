@@ -11,6 +11,8 @@
 class VLX {
 private:
   MUX mux_;
+  SingleEMAFilter<float> distanceFilter_{0.25};
+  bool hasFilteredDistance_ = false;
   static constexpr uint8_t kMaxInitAttempts_ = 5;
   static constexpr uint32_t kTimingBudget = 33000;
 

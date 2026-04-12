@@ -19,7 +19,7 @@ private:
   float phaseCorrectionY_ = 0.0;
   float filteredAngleX_ = 0.0;
   float filteredAngleY_ = 0.0;
-  static constexpr float orientationFilterAlpha_ = 0.1f;
+  static constexpr float orientationFilterAlpha_ = 0.05f;
   const uint8_t I2CAddress = 0x28;
   const int32_t sensorID = 55;
 

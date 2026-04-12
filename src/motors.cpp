@@ -10,22 +10,15 @@ void motors::setupMotors() {
   Wire.begin();
   delay(10);
   Wire.setClock(400000);
-  screenBegin();
-  screenPrint("BNO NOT INITIALIZED");
+  // screenBegin();
   bno.setupBNO();
-  screenPrint("VLX " + String(vlxID::left) + " NOT INITIALIZED");
   setupVlx(vlxID::left);
-  screenPrint("VLX " + String(vlxID::frontRight) + " NOT INITIALIZED");
   setupVlx(vlxID::frontRight);
-  screenPrint("VLX " + String(vlxID::right) + " NOT INITIALIZED");
   setupVlx(vlxID::right);
-  screenPrint("VLX " + String(vlxID::frontLeft) + " NOT INITIALIZED");
   setupVlx(vlxID::frontLeft);
-  screenPrint("VLX " + String(vlxID::back) + " NOT INITIALIZED");
   setupVlx(vlxID::back);
-  //setupTCS();
-  limitSwitch_[LimitSwitchID::kLeft].initLimitSwitch(Pins::limitSwitchPins[LimitSwitchID::kLeft]);
-  limitSwitch_[LimitSwitchID::kRight].initLimitSwitch(Pins::limitSwitchPins[LimitSwitchID::kRight]);
+  setupTCS();
+
   for (uint8_t i = 0; i < 4; i++) {
     motor[i].initialize(Pins::digitalOne[i], Pins::digitalTwo[i],
                         Pins::pwmPin[i], i);
@@ -33,7 +26,6 @@ void motors::setupMotors() {
   }
   rampUpPID.changeConstants(kP_RampUp, kI_RampUp, kD_RampUp, rampTime);
   rampDownPID.changeConstants(kP_RampDown, kI_RampDown, kD_RampDown, rampTime);
-  pidBno.changeConstants(0.6, 0.1, 0.01, 1);
 
   targetAngle = 0;
   delay(500);
@@ -59,7 +51,11 @@ void motors::PID_Wheel(int targetSpeed, int i) {
   int speed_setpoint = targetSpeed;
   int reference_pwm;
   reference_pwm = motor[i].getSpeed();
+  Serial.println("reference_pwm");
+  Serial.println(reference_pwm);
   int speedTics = motor[i].getTicsSpeed();
+  Serial.println("speedTics");
+  Serial.println(speedTics);
   float error = myPID[i].calculate_PID(speed_setpoint, speedTics);
   int speed = reference_pwm + error;
   speed = constrain(speed, 0, 255);
@@ -73,29 +69,27 @@ void motors::PID_AllWheels(int targetSpeed) {
 
 void motors::pidEncoders(int speedReference, bool ahead) {
   bno.getOrientationX();
+  static PID pidBno(0.5, 0.1, 0.01, 1);
   if (rampState != 0)
     changeAngle = 0;
   float AngleError = pidBno.calculate_PID(
       targetAngle + changeAngle, (targetAngle == 0 ? z_rotation : angle));
-  AngleError = constrain(AngleError, -20 * 5, 20 * 5);
+  AngleError = constrain(AngleError, -17, 17);
+  // Serial.println(AngleError);
+  Serial.println(AngleError);
   if (!ahead)
     AngleError = -AngleError;
+  PID_Wheel(speedReference + AngleError, MotorID::kFrontLeft);
+  PID_Wheel(speedReference + AngleError, MotorID::kBackLeft);
   PID_Wheel(speedReference - AngleError, MotorID::kFrontRight);
   PID_Wheel(speedReference - AngleError, MotorID::kBackRight);
-  PID_Wheel(speedReference + AngleError, MotorID::kFrontLeft);
-  PID_Wheel(speedReference + AngleError + kSpeedLeftCorrection, MotorID::kBackLeft);
 }
 
 void motors::ahead() {
-  float targetAngle_ = targetAngle;
-  float angleX = bno.getOrientationX();
   passObstacle();
   passObstacle(); // double verification (if obstacle still in the way rotate,
                   // else, ignore)
   nearWall();
-   if (abs(targetAngle_ - angleX) >= minAngleToCorrect){
-    rotate(targetAngle_ + changeAngle);
-  }
   resetTics();
   int offset = 0;
   ;
@@ -121,6 +115,8 @@ void motors::ahead() {
 
   String print = static_cast<String>(frontDistance);
   // robot.screenPrint(print);
+  if (frontDistance > 800)
+    rampCaution = true;
   if (abs(bno.getOrientationY()) > 15) {
     encoder = true;
     offset = kTicsPerTile / 6;
@@ -139,7 +135,7 @@ void motors::ahead() {
         break;
       if (isRamp())
         break;
-      limitCrash();
+      // limitCrash();
       distance = (frontVlx ? max(vlx[vlxID::frontLeft].getDistance(),
                                  vlx[vlxID::frontRight].getDistance())
                            : vlx[vlxID::back].getDistance());
@@ -155,36 +151,35 @@ void motors::ahead() {
         if (getAvergeTics() > kTicsPerTile)
           break;
       }
+      if (rampCaution)
+        speed = map(missingDistance, kTileLength, 0, (kMaxSpeedFormard / 3),
+                    kMinSpeedFormard);
       speed = constrain(speed, kMinSpeedFormard, kMaxSpeedFormard);
       pidEncoders(speed, true);
-      screenPrint(String(bno.getOrientationX()));
     }
   } else if (encoder) {
     while (getAvergeTics() < kTicsPerTile - offset) {
       setahead();
-      limitCrash();
+      // limitCrash();
       // checkTileColor();
       if (blackTile)
         return;
       if (buttonPressed)
         break;
-      isRamp();
+      if (isRamp())
+        break;
       float missingDistance =
           kTileLength - (getAvergeTics() * kTileLength / kTicsPerTile);
       float speed = map(missingDistance, kTileLength, 0, kMaxSpeedFormard,
                         kMinSpeedFormard);
       speed = constrain(speed, kMinSpeedFormard, kMaxSpeedFormard);
+      if (rampCaution)
+        speed = map(missingDistance, kTileLength, 0, (kMaxSpeedFormard / 3),
+                    kMinSpeedFormard);
       pidEncoders(speed, true);
-      screenPrint(String(bno.getOrientationX()));
     }
   }
   slope = false;
-  stop();
-  nearWall();
-  angleX = bno.getOrientationX();
-  if (abs(targetAngle_ - angleX) >= minAngleToCorrect){
-    rotate(targetAngle_ + changeAngle);
-  }
   stop();
   resetTics();
   // checkTileColor();
@@ -225,45 +220,22 @@ void motors::checkTileColor() {
 float motors::nearWall() {
   // float left = AverageLeftDistance();
   // float right = AverageRightDistance();
-  float leftDist = vlx[vlxID::left].getDistance();
-  float rightDist = vlx[vlxID::right].getDistance();
-
-  
-  static constexpr float wallCenterKp = 0.4f;
-  static constexpr float wallDeadband = 3.0f;
- 
-  bool leftValid = 12 >= leftDist;
-  bool rightValid = 12 >= rightDist;
-
-  if ((!leftValid && !rightValid) || abs(leftDist - rightDist) <= 2) {
-    return 0; // no usable side sensor
-  }
-
-  if (!rightValid) {
-    // only left wall available
-    changeAngle = (leftDist < minDisToLateralWall) ? maxChangeAngle : 0;
-    return changeAngle;
-  }
-
-  if (!leftValid) {
-    // only right wall available
-    changeAngle = (rightDist < minDisToLateralWall) ? -maxChangeAngle : 0;
-    return changeAngle;
-  }
-
-  float error = rightDist - leftDist;
-  if (fabs(error) <= wallDeadband) {
-    changeAngle = 0;
+  if (vlx[vlxID::left].getDistance() < minDisToLateralWall) {
+    changeAngle = maxChangeAngle;
+  } else if (vlx[vlxID::right].getDistance() < minDisToLateralWall) {
+    changeAngle = -maxChangeAngle;
   } else {
-    changeAngle = constrain(error * wallCenterKp, -maxChangeAngle, maxChangeAngle);
+    changeAngle = 0;
   }
-
   return changeAngle;
 }
 
 void motors::passObstacle() {
   float targetAngle_ = targetAngle;
   float sideAngle = targetAngle_;
+  float angle = bno.getOrientationX();
+  if (abs(targetAngle_ - angle) >= 2)
+    rotate(targetAngle_);
   bool leftBlocked = vlx[vlxID::frontLeft].getDistance() < kDistanceToObstacle;
   bool rightBlocked =
       vlx[vlxID::frontRight].getDistance() < kDistanceToObstacle;
@@ -273,9 +245,7 @@ void motors::passObstacle() {
   if (leftBlocked && rightBlocked)
     return; // Completely blocked, can't pass
 
-  if (vlx[vlxID::back].getDistance() > 20) {
-    moveDistance(kTileLength / 5, false);
-  }
+  moveDistance(kTileLength / 5, false);
   limitColition = true;
   if (leftBlocked || rightBlocked) {
     float sideAngle = targetAngle + (leftBlocked ? 25 : -25);
@@ -290,51 +260,42 @@ void motors::passObstacle() {
   rotate(targetAngle_);
   limitColition = false;
 }
-
+/*
 void motors::limitCrash(){
-    if(slope) return;
     float targetAngle_=targetAngle;
     bool leftState=limitSwitch_[LimitSwitchID::kLeft].getState();
     bool rightState=limitSwitch_[LimitSwitchID::kRight].getState();
-    if (leftState || rightState) {
-      delay(30); // Debounce delay
-      if ((leftState != limitSwitch_[LimitSwitchID::kLeft].getState()) || //If states update within millis
-          (rightState != limitSwitch_[LimitSwitchID::kRight].getState())) {
-        leftState = limitSwitch_[LimitSwitchID::kLeft].getState();
-        rightState = limitSwitch_[LimitSwitchID::kRight].getState();
-      }
-      if(rampState!=0 ){
-          if(leftState || rightState) limitColition=true;
-          return;
-      }
-      if(!leftState && !rightState){
-          return;
-      }
-      if (leftState && rightState) {
-        moveDistance(kTileLength / 3, false);
-        stop();
-        rotate(targetAngle_);
-        limitColition = false;
+    if(slope) return;
+    if(rampState!=0 ){
+        if(leftState || rightState) limitColition=true;
         return;
-      }
-
-      moveDistance(kTileLength / 5, false);
-      
-      if (leftState || rightState) {
-        float sideAngle = targetAngle + (leftState ? 25 : -25);  
-        if (sideAngle >= 360)
-          sideAngle -= 360;
-        if (sideAngle < 0)
-          sideAngle += 360;
-        moveDistance(kTileLength / 5, false);
-        rotate(sideAngle);
-        moveDistance(3 * kTileLength / 10, true);
-      }
-      rotate(targetAngle_);
-      limitColition = false;
-  }
+    }
+    if((leftState && rightState) || (!leftState && !rightState)){
+        return;
+    }
+    else if(rightState){
+        screenPrint("RightLimit");
+        Serial.println("rightlimit");
+        if(targetAngle==360){
+            targetAngle=0;
+        }
+        rotate(targetAngle+25);
+    }else if(leftState){
+        screenPrint("leftLimit");
+        Serial.println("rightlimit");
+        if(targetAngle==0){
+            targetAngle=360;
+        }
+        rotate(targetAngle-25);
+    }
+    delay(300);
+    moveDistance(kTileLength/6,false);
+    delay(300);
+    targetAngle=targetAngle_;
+    rotate(targetAngle);
+    limitColition=false;
 }
-
+*/
 uint8_t motors::findNearest(float number, const uint8_t numbers[], uint8_t size,
                             bool frontVlx) {
   if (frontVlx)
@@ -430,16 +391,10 @@ float motors::changeSpeedMove(bool encoders, bool rotate, int targetDistance,
   float speed;
   float missingDistance, missingAngle;
   if (rotate == true) {
-    if (limitColition) {
-      kMaxSpeedRotate = 50;
-    }
     missingAngle = abs(targetAngle - (targetAngle == 0 ? z_rotation : angle));
     speed = map(missingAngle, 90, 0, kMaxSpeedRotate, kMinSpeedRotate);
     speed = constrain(speed, kMinSpeedRotate, kMaxSpeedRotate);
-    PID_Wheel(speed, MotorID::kFrontLeft);
-    PID_Wheel(speed, MotorID::kBackLeft);
-    PID_Wheel(speed, MotorID::kFrontRight);
-    PID_Wheel(speed, MotorID::kBackRight);
+    PID_AllWheels(speed);
     return 0;
   } else {
     if (encoders == true) {
@@ -619,9 +574,9 @@ bool motors::isWall(uint8_t direction) {
   uint8_t realPos = rulet[relativeDir][direction];
   bool frontLeft = vlx[vlxID::frontLeft].isWall();
   bool frontRight = vlx[vlxID::frontRight].isWall();
-  bool right = vlx[vlxID::right].getDistance() < DisToSideWall;
+  bool right = vlx[vlxID::right].isWall();
   bool back = vlx[vlxID::back].isWall();
-  bool left = vlx[vlxID::left].getDistance() < DisToSideWall;
+  bool left = vlx[vlxID::left].isWall();
 
   switch (realPos) {
   case 0:
@@ -669,10 +624,10 @@ bool motors::isRamp() {
 void motors::ramp() {
   resetTics();
   setahead();
-  while (bno.getOrientationY()  < -7) {
+  while (bno.getOrientationY() > 7) {
     if (buttonPressed == true)
       break;
-    limitCrash();
+    // limitCrash();
     if (limitColition == true) {
       stop();
       break;
@@ -685,7 +640,7 @@ void motors::ramp() {
         (vlx[vlxID::right].distance < 6 || vlx[vlxID::left].distance < 6)) {
       error = rampUpPID.calculate_PID(
           0, (vlx[vlxID::right].distance - vlx[vlxID::left].distance));
-      error = constrain(error, -15 * 5, 15 * 5);
+      error = constrain(error, -15, 15);
       PID_Wheel(kSpeedRampUp - error, MotorID::kFrontLeft);
       PID_Wheel(kSpeedRampUp - error, MotorID::kBackLeft);
       PID_Wheel(kSpeedRampUp + error, MotorID::kFrontRight);
@@ -696,10 +651,10 @@ void motors::ramp() {
     rampState = 1;
     screenPrint("rampUp");
   }
-  while (bno.getOrientationY() > 7) {
+  while (bno.getOrientationY() < -7) {
     if (buttonPressed == true)
       break;
-    limitCrash();
+    // limitCrash();
     if (limitColition == true)
       break;
     float error;
@@ -708,18 +663,18 @@ void motors::ramp() {
     if ((vlx[vlxID::right].distance < vlx[vlxID::right].kDistanceToWall &&
          vlx[vlxID::left].distance < vlx[vlxID::left].kDistanceToWall) &&
         (vlx[vlxID::right].distance < 6 || vlx[vlxID::left].distance < 6)) {
-      error = rampUpPID.calculate_PID(
+      error = rampDownPID.calculate_PID(
           0, (vlx[vlxID::right].distance - vlx[vlxID::left].distance));
-      error = constrain(error, -12 * 5, 12 * 5);
+      error = constrain(error, -6, 6);
       PID_Wheel(kSpeedRampDown - error, MotorID::kFrontLeft);
       PID_Wheel(kSpeedRampDown - error, MotorID::kBackLeft);
       PID_Wheel(kSpeedRampDown + error, MotorID::kFrontRight);
       PID_Wheel(kSpeedRampDown + error, MotorID::kBackRight);
     } else {
-      pidEncoders(kSpeedRampUp, true);
-    } 
+      pidEncoders(kSpeedRampDown, true);
+    }
     rampState = 2;
-    screenPrint("rampDown");
+    // screenPrint("rampDown");
   }
   if (getAvergeTics() > 1 * kTicsPerTile && rampState == 1) {
     // stop();
@@ -727,18 +682,15 @@ void motors::ramp() {
     // setahead();
     moveDistance(kTileLength / 3, true);
     rotate(targetAngle);
-  } 
-  else if (getAvergeTics() > 1 * kTicsPerTile && rampState == 2) {
+  } else if (getAvergeTics() > 0.8 * kTicsPerTile && rampState == 2) {
     // stop();
     // bno.resetOrientationX();
     // setahead();
-    moveDistance(kTileLength / 3, true);
+    moveDistance(kTileLength / 2, true);
     rotate(targetAngle);
-  }
-  else {
+  } else {
     rampState = 0;
   }
-  
   limitColition = false;
   resetTics();
   stop();
