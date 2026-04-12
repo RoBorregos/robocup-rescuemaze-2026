@@ -15,7 +15,7 @@ private:
   static constexpr uint32_t kTimingBudget = 33000;
 
 public:
-  static constexpr uint8_t kDistanceToWall = 15;
+  static constexpr uint8_t kDistanceToWall = 20;
   bool initialized = false;
   float distance = 0.0f;
   Adafruit_VL53L0X VLX_ = Adafruit_VL53L0X();

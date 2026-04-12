@@ -20,7 +20,7 @@
 #define PCA9548A_ADDR 0x70      // PCA9548A Direction
 #define PCA9548A_CHANNEL_4 0x20 // Canal 4 (SDA4/SCL4)
 
-constexpr uint8_t edgeTileDistance = 9;
+constexpr uint8_t edgeTileDistance = 8;
 constexpr uint8_t kTileLength = 30;
 constexpr uint8_t rulet[4][4] = {
     {0, 1, 2, 3}, {3, 0, 1, 2}, {2, 3, 0, 1}, {1, 2, 3, 0}};
@@ -41,35 +41,36 @@ private:
   static constexpr uint8_t kDistanceToWall = 12;
   static constexpr uint8_t kDistanceToObstacle = 20;
   // wheels
-  static constexpr float wheelDiameter = 7.5;
+  static constexpr float wheelDiameter = 6.8;
   static constexpr float distancePerRev = wheelDiameter * PI;
   static constexpr float kTicsPerRev = 496.0;
   static constexpr float kTicsPerTile = 30 * kTicsPerRev / distancePerRev;
   // Pwm constants
   uint16_t kMinPwmRotate = 70;
   uint16_t kMaxPwmRotate = 160;
-  uint16_t kMinPwmFormard = 70;
-  uint16_t kMaxPwmFormard = 180;
+  uint16_t kMinPwmFormard = 150;
+  uint16_t kMaxPwmFormard = 250;
   // Speeds constants
-  uint16_t kMinSpeedRotate = 10;
-  static constexpr uint16_t kMaxSpeedRotate = 30;
-  static constexpr uint16_t kMinSpeedFormard = 12;
-  static constexpr uint16_t kMaxSpeedFormard = 40;
-  static constexpr uint16_t kSpeedRampUp = 20;
-  static constexpr uint16_t kSpeedRampDown = 9;
+  uint16_t kMinSpeedRotate = 10 * 3;
+  uint16_t kMaxSpeedRotate = 40 * 3;
+  static constexpr uint16_t kMinSpeedFormard = 30 * 5;
+  static constexpr uint16_t kMaxSpeedFormard = 45 * 5;
+  static constexpr uint16_t kSpeedRampUp = 20 * 5;
+  static constexpr uint16_t kSpeedRampDown = 15 * 5;
   static constexpr uint16_t kSpeedCorrection = 0;
   static constexpr uint16_t kSpeedLeftCorrection = 0;
   // ramp
   PID rampUpPID;
   PID rampDownPID;
+  PID pidBno;
   bool slope = false;
   static constexpr float kMinRampOrientation = 18.0;
   // control Walls
-  static constexpr float minDisToLateralWall = 6;
+  static constexpr float minDisToLateralWall = 5;
   static constexpr float DisToSideWall = 20;
   float changeAngle = 0;
-  static constexpr uint8_t maxChangeAngle = 3;
-  static constexpr uint8_t minAngleToCorrect = 10;
+  static constexpr uint8_t maxChangeAngle = 4;
+  static constexpr uint8_t minAngleToCorrect = 0;
   // PID movement constants
   static constexpr float kP_mov = 1;
   static constexpr float kI_mov = 0.00;

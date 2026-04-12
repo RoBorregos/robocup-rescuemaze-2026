@@ -2,7 +2,7 @@
 #define TEST_H
 #include "Encoder.h"
 void testEncoder(uint8_t);
-void testVlx(uint8_t);
+void testVlx();
 void testVlxFrontLeft();
 void testVlxFrontRigth();
 void testVlxRight();

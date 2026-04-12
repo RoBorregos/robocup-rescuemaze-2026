@@ -26,7 +26,13 @@ void testButton() {
   // robot.screenPrint(print);
   Serial.println(print);
 }
-void testVlx(uint8_t id) { Serial.println(robot.vlx[id].getDistance()); }
+void testVlx() { robot.screenPrint("FL: " + String(robot.vlx[vlxID::frontLeft].getDistance()) + " FR: " + String(robot.vlx[vlxID::frontRight].getDistance()) + " B: " + String(robot.vlx[vlxID::back].getDistance()));
+  delay(1000);
+  robot.screenPrint("L: " + String(robot.vlx[vlxID::left].getDistance()) + " R: " + String(robot.vlx[vlxID::right].getDistance()));
+  delay(1000);
+  robot.screenPrint("FL: " + String(robot.vlx[vlxID::frontLeft].getDistance()) + " FR: " + String(robot.vlx[vlxID::frontRight].getDistance()));
+  delay(1000);
+}
 void testVlxFrontLeft() {
   float distance = robot.vlx[vlxID::frontLeft].getDistance();
   Serial.println(distance);
@@ -77,22 +83,28 @@ void testVlxFrontDistance() {
 void testMotors() {
   int dt = 1000;
   robot.setahead();
-  delay(dt);
-  Serial.println("BackRight");
-  robot.motor[MotorID::kBackRight].setSpeed(150);
-  delay(dt);
-  Serial.println("FrontRight");
-  robot.motor[MotorID::kFrontRight].setSpeed(150);
-  delay(dt);
-  Serial.println("BackLeft");
-  robot.motor[MotorID::kBackLeft].setSpeed(150);
-  delay(dt);
-  Serial.println("FrontLeft");
-  robot.motor[MotorID::kFrontLeft].setSpeed(150);
-  delay(dt);
+  //delay(dt);
+  robot.screenPrint("BackRight");
+  robot.motor[MotorID::kBackRight].setSpeed(200);
+  //delay(dt);
+  robot.screenPrint("FrontRight");
+  robot.motor[MotorID::kFrontRight].setSpeed(200);
+  //delay(dt);
+  robot.screenPrint("BackLeft");
+  robot.motor[MotorID::kBackLeft].setSpeed(200);
+  //delay(dt);
+  robot.screenPrint("FrontLeft");
+  robot.motor[MotorID::kFrontLeft].setSpeed(200);
+  //delay(dt);
   // robot.setSpeed(0);
   while (1)
-    ;
+  {
+    delay(1000);
+    robot.screenPrint("L: " + String(robot.vlx[vlxID::left].getDistance()) + " R: " + String(robot.vlx[vlxID::right].getDistance()));
+    delay(1000);
+    robot.screenPrint("FL: " + String(robot.vlx[vlxID::frontLeft].getDistance()) + " FR: " + String(robot.vlx[vlxID::frontRight].getDistance()));
+    delay(1000);
+  };
 }
 
 void testPIDWheel() {

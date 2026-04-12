@@ -33,6 +33,7 @@ void motors::setupMotors() {
   }
   rampUpPID.changeConstants(kP_RampUp, kI_RampUp, kD_RampUp, rampTime);
   rampDownPID.changeConstants(kP_RampDown, kI_RampDown, kD_RampDown, rampTime);
+  pidBno.changeConstants(0.6, 0.1, 0.01, 1);
 
   targetAngle = 0;
   delay(500);
@@ -72,29 +73,29 @@ void motors::PID_AllWheels(int targetSpeed) {
 
 void motors::pidEncoders(int speedReference, bool ahead) {
   bno.getOrientationX();
-  static PID pidBno(0.5, 0.1, 0.01, 1);
   if (rampState != 0)
     changeAngle = 0;
   float AngleError = pidBno.calculate_PID(
       targetAngle + changeAngle, (targetAngle == 0 ? z_rotation : angle));
-  AngleError = constrain(AngleError, -17, 17);
+  AngleError = constrain(AngleError, -20 * 5, 20 * 5);
   if (!ahead)
     AngleError = -AngleError;
   PID_Wheel(speedReference - AngleError, MotorID::kFrontRight);
   PID_Wheel(speedReference - AngleError, MotorID::kBackRight);
   PID_Wheel(speedReference + AngleError, MotorID::kFrontLeft);
-  PID_Wheel(speedReference + AngleError, MotorID::kBackLeft);
+  PID_Wheel(speedReference + AngleError + kSpeedLeftCorrection, MotorID::kBackLeft);
 }
 
 void motors::ahead() {
   float targetAngle_ = targetAngle;
-  if (abs(targetAngle_ - angle) >= minAngleToCorrect) {
-    rotate(targetAngle_);
-  }
+  float angleX = bno.getOrientationX();
   passObstacle();
   passObstacle(); // double verification (if obstacle still in the way rotate,
                   // else, ignore)
   nearWall();
+   if (abs(targetAngle_ - angleX) >= minAngleToCorrect){
+    rotate(targetAngle_ + changeAngle);
+  }
   resetTics();
   int offset = 0;
   ;
@@ -156,6 +157,7 @@ void motors::ahead() {
       }
       speed = constrain(speed, kMinSpeedFormard, kMaxSpeedFormard);
       pidEncoders(speed, true);
+      screenPrint(String(bno.getOrientationX()));
     }
   } else if (encoder) {
     while (getAvergeTics() < kTicsPerTile - offset) {
@@ -166,26 +168,26 @@ void motors::ahead() {
         return;
       if (buttonPressed)
         break;
-      if (isRamp())
-        break;
+      isRamp();
       float missingDistance =
           kTileLength - (getAvergeTics() * kTileLength / kTicsPerTile);
       float speed = map(missingDistance, kTileLength, 0, kMaxSpeedFormard,
                         kMinSpeedFormard);
       speed = constrain(speed, kMinSpeedFormard, kMaxSpeedFormard);
       pidEncoders(speed, true);
+      screenPrint(String(bno.getOrientationX()));
     }
   }
   slope = false;
   stop();
-  float angle = bno.getOrientationX();
-  if (abs(targetAngle_ - angle) >= minAngleToCorrect) {
-    rotate(targetAngle_);
+  nearWall();
+  angleX = bno.getOrientationX();
+  if (abs(targetAngle_ - angleX) >= minAngleToCorrect){
+    rotate(targetAngle_ + changeAngle);
   }
   stop();
   resetTics();
   // checkTileColor();
-  screenPrint(String (vlx[vlxID::right].getDistance()) + String (vlx[vlxID::left].getDistance())); 
 }
 
 void motors::checkTileColor() {
@@ -223,13 +225,39 @@ void motors::checkTileColor() {
 float motors::nearWall() {
   // float left = AverageLeftDistance();
   // float right = AverageRightDistance();
-  if (vlx[vlxID::left].getDistance() < minDisToLateralWall) {
-    changeAngle = maxChangeAngle;
-  } else if (vlx[vlxID::right].getDistance() < minDisToLateralWall) {
-    changeAngle = -maxChangeAngle;
-  } else {
-    changeAngle = 0;
+  float leftDist = vlx[vlxID::left].getDistance();
+  float rightDist = vlx[vlxID::right].getDistance();
+
+  
+  static constexpr float wallCenterKp = 0.4f;
+  static constexpr float wallDeadband = 3.0f;
+ 
+  bool leftValid = 12 >= leftDist;
+  bool rightValid = 12 >= rightDist;
+
+  if ((!leftValid && !rightValid) || abs(leftDist - rightDist) <= 2) {
+    return 0; // no usable side sensor
   }
+
+  if (!rightValid) {
+    // only left wall available
+    changeAngle = (leftDist < minDisToLateralWall) ? maxChangeAngle : 0;
+    return changeAngle;
+  }
+
+  if (!leftValid) {
+    // only right wall available
+    changeAngle = (rightDist < minDisToLateralWall) ? -maxChangeAngle : 0;
+    return changeAngle;
+  }
+
+  float error = rightDist - leftDist;
+  if (fabs(error) <= wallDeadband) {
+    changeAngle = 0;
+  } else {
+    changeAngle = constrain(error * wallCenterKp, -maxChangeAngle, maxChangeAngle);
+  }
+
   return changeAngle;
 }
 
@@ -269,7 +297,7 @@ void motors::limitCrash(){
     bool leftState=limitSwitch_[LimitSwitchID::kLeft].getState();
     bool rightState=limitSwitch_[LimitSwitchID::kRight].getState();
     if (leftState || rightState) {
-      delay(70); // Debounce delay
+      delay(30); // Debounce delay
       if ((leftState != limitSwitch_[LimitSwitchID::kLeft].getState()) || //If states update within millis
           (rightState != limitSwitch_[LimitSwitchID::kRight].getState())) {
         leftState = limitSwitch_[LimitSwitchID::kLeft].getState();
@@ -283,10 +311,8 @@ void motors::limitCrash(){
           return;
       }
       if (leftState && rightState) {
-        if (vlx[vlxID::back].getDistance() > 20) {
         moveDistance(kTileLength / 3, false);
         stop();
-        }
         rotate(targetAngle_);
         limitColition = false;
         return;
@@ -300,7 +326,7 @@ void motors::limitCrash(){
           sideAngle -= 360;
         if (sideAngle < 0)
           sideAngle += 360;
-
+        moveDistance(kTileLength / 5, false);
         rotate(sideAngle);
         moveDistance(3 * kTileLength / 10, true);
       }
@@ -405,13 +431,13 @@ float motors::changeSpeedMove(bool encoders, bool rotate, int targetDistance,
   float missingDistance, missingAngle;
   if (rotate == true) {
     if (limitColition) {
-      kMinSpeedRotate = 10;
+      kMaxSpeedRotate = 50;
     }
     missingAngle = abs(targetAngle - (targetAngle == 0 ? z_rotation : angle));
     speed = map(missingAngle, 90, 0, kMaxSpeedRotate, kMinSpeedRotate);
     speed = constrain(speed, kMinSpeedRotate, kMaxSpeedRotate);
-    PID_Wheel(speed + 10, MotorID::kFrontLeft);
-    PID_Wheel(speed - kSpeedLeftCorrection, MotorID::kBackLeft);
+    PID_Wheel(speed, MotorID::kFrontLeft);
+    PID_Wheel(speed, MotorID::kBackLeft);
     PID_Wheel(speed, MotorID::kFrontRight);
     PID_Wheel(speed, MotorID::kBackRight);
     return 0;
@@ -659,7 +685,7 @@ void motors::ramp() {
         (vlx[vlxID::right].distance < 6 || vlx[vlxID::left].distance < 6)) {
       error = rampUpPID.calculate_PID(
           0, (vlx[vlxID::right].distance - vlx[vlxID::left].distance));
-      error = constrain(error, -15, 15);
+      error = constrain(error, -15 * 5, 15 * 5);
       PID_Wheel(kSpeedRampUp - error, MotorID::kFrontLeft);
       PID_Wheel(kSpeedRampUp - error, MotorID::kBackLeft);
       PID_Wheel(kSpeedRampUp + error, MotorID::kFrontRight);
@@ -684,11 +710,11 @@ void motors::ramp() {
         (vlx[vlxID::right].distance < 6 || vlx[vlxID::left].distance < 6)) {
       error = rampUpPID.calculate_PID(
           0, (vlx[vlxID::right].distance - vlx[vlxID::left].distance));
-      error = constrain(error, -15, 15);
-      PID_Wheel(kSpeedRampUp - error, MotorID::kFrontLeft);
-      PID_Wheel(kSpeedRampUp - error, MotorID::kBackLeft);
-      PID_Wheel(kSpeedRampUp + error, MotorID::kFrontRight);
-      PID_Wheel(kSpeedRampUp + error, MotorID::kBackRight);
+      error = constrain(error, -12 * 5, 12 * 5);
+      PID_Wheel(kSpeedRampDown - error, MotorID::kFrontLeft);
+      PID_Wheel(kSpeedRampDown - error, MotorID::kBackLeft);
+      PID_Wheel(kSpeedRampDown + error, MotorID::kFrontRight);
+      PID_Wheel(kSpeedRampDown + error, MotorID::kBackRight);
     } else {
       pidEncoders(kSpeedRampUp, true);
     } 
@@ -701,15 +727,18 @@ void motors::ramp() {
     // setahead();
     moveDistance(kTileLength / 3, true);
     rotate(targetAngle);
-  } else if (getAvergeTics() > 0.8 * kTicsPerTile && rampState == 2) {
+  } 
+  else if (getAvergeTics() > 1 * kTicsPerTile && rampState == 2) {
     // stop();
     // bno.resetOrientationX();
     // setahead();
-    moveDistance(kTileLength / 2, true);
+    moveDistance(kTileLength / 3, true);
     rotate(targetAngle);
-  } else {
+  }
+  else {
     rampState = 0;
   }
+  
   limitColition = false;
   resetTics();
   stop();
