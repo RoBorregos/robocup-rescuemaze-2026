@@ -13,7 +13,11 @@ void Motor::initialize(uint8_t in_1, uint8_t in_2, uint8_t en,
 }
 
 Motor::Motor() {
-  // default constructor
+  speed = 0;
+  ticsSpeed = 0;
+  tics = 0;
+  deltaTics = 0;
+  last_time = millis();
 }
 void Motor::updateTics() {
   tics += 1;

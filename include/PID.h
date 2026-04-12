@@ -6,8 +6,8 @@ private:
   float kp;
   float ki;
   float kd;
-  float last_error;
-  float last_time;
+  float last_error = 0.0f;
+  float last_time = 0.0f;
   float accumulated_error = 0.0f;
   static constexpr float MAX_INTEGRAL = 100.0f;
 

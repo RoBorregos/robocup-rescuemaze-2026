@@ -321,6 +321,8 @@ void maze::dfs(arrCustom<coord> &visitedMap, arrCustom<Tile> &tiles,
 
       robotCoord = current;
 
+      robot.wait(60);
+
       currentTile = &tiles.getValue(tilesMap.getIndex(current));
       for (const TileDirection direction : directions) {
         wall = false;

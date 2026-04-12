@@ -6,6 +6,58 @@
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 motors::motors() {}
 
+namespace {
+float normalize360(float angleValue) {
+  while (angleValue >= 360.0f) {
+    angleValue -= 360.0f;
+  }
+  while (angleValue < 0.0f) {
+    angleValue += 360.0f;
+  }
+  return angleValue;
+}
+
+float signedAngleError(float target, float current) {
+  float error = normalize360(target) - normalize360(current);
+  if (error > 180.0f) {
+    error -= 360.0f;
+  } else if (error < -180.0f) {
+    error += 360.0f;
+  }
+  return error;
+}
+
+float frontMinDistance(float leftDistance, float rightDistance) {
+  const bool leftValid = leftDistance >= 1.0f && leftDistance < 819.0f;
+  const bool rightValid = rightDistance >= 1.0f && rightDistance < 819.0f;
+
+  if (leftValid && rightValid) {
+    return min(leftDistance, rightDistance);
+  }
+  if (leftValid) {
+    return leftDistance;
+  }
+  if (rightValid) {
+    return rightDistance;
+  }
+  return 819.0f;
+}
+
+float stableDistance(VLX &sensor) {
+  float first = sensor.getDistance();
+  delay(2);
+  float second = sensor.getDistance();
+
+  if (first >= 819.0f) {
+    return second;
+  }
+  if (second >= 819.0f) {
+    return first;
+  }
+  return (first + second) * 0.5f;
+}
+} // namespace
+
 void motors::setupMotors() {
   Wire.begin();
   delay(10);
@@ -17,13 +69,18 @@ void motors::setupMotors() {
   setupVlx(vlxID::right);
   setupVlx(vlxID::frontLeft);
   setupVlx(vlxID::back);
-  setupTCS();
+  // setupTCS();
 
   for (uint8_t i = 0; i < 4; i++) {
     motor[i].initialize(Pins::digitalOne[i], Pins::digitalTwo[i],
                         Pins::pwmPin[i], i);
     myPID[i].changeConstants(kP_mov, kI_mov, kD_mov, movTime);
   }
+
+  turnPID_.configure(2.4f, 0.0f, 0.22f);
+  turnPID_.setOutputLimits(kMinSpeedRotate, kMaxSpeedRotate);
+  turnPID_.setSettleCriteria(1.2f, 140);
+
   rampUpPID.changeConstants(kP_RampUp, kI_RampUp, kD_RampUp, rampTime);
   rampDownPID.changeConstants(kP_RampDown, kI_RampDown, kD_RampDown, rampTime);
 
@@ -51,13 +108,13 @@ void motors::PID_Wheel(int targetSpeed, int i) {
   int speed_setpoint = targetSpeed;
   int reference_pwm;
   reference_pwm = motor[i].getSpeed();
-  Serial.println("reference_pwm");
-  Serial.println(reference_pwm);
   int speedTics = motor[i].getTicsSpeed();
-  Serial.println("speedTics");
-  Serial.println(speedTics);
   float error = myPID[i].calculate_PID(speed_setpoint, speedTics);
   int speed = reference_pwm + error;
+  const int minEffectivePwm = 50;
+  if (speed_setpoint > 0 && speed > 0 && speed < minEffectivePwm) {
+    speed = minEffectivePwm;
+  }
   speed = constrain(speed, 0, 255);
   motor[i].setSpeed(speed);
 }
@@ -70,25 +127,75 @@ void motors::PID_AllWheels(int targetSpeed) {
 void motors::pidEncoders(int speedReference, bool ahead) {
   bno.getOrientationX();
   static PID pidBno(0.5, 0.1, 0.01, 1);
+  static PID pidWheelBalance(0.6, 0.0, 0.03, 20);
+  static float smoothedHeadingTarget = 0.0f;
+  static bool headingInitialized = false;
+  static float lastTotalCorrection = 0.0f;
+
   if (rampState != 0)
     changeAngle = 0;
-  float AngleError = pidBno.calculate_PID(
-      targetAngle + changeAngle, (targetAngle == 0 ? z_rotation : angle));
-  AngleError = constrain(AngleError, -17, 17);
-  // Serial.println(AngleError);
-  Serial.println(AngleError);
+
+  const float currentHeading = (targetAngle == 0 ? z_rotation : angle);
+  const float desiredHeading = normalize360(targetAngle + changeAngle);
+
+  if (!headingInitialized) {
+    smoothedHeadingTarget = desiredHeading;
+    headingInitialized = true;
+  }
+
+  const float kHeadingTargetMaxStepDeg = 0.8f;
+  float headingTargetStep =
+      signedAngleError(desiredHeading, smoothedHeadingTarget);
+  headingTargetStep = constrain(headingTargetStep, -kHeadingTargetMaxStepDeg,
+                                kHeadingTargetMaxStepDeg);
+  smoothedHeadingTarget = normalize360(smoothedHeadingTarget + headingTargetStep);
+
+  float AngleError = pidBno.calculate_PID(smoothedHeadingTarget, currentHeading);
+  AngleError = constrain(AngleError, -12, 12);
+
+  const float leftMeasured =
+      (motor[MotorID::kFrontLeft].getTicsSpeed() +
+       motor[MotorID::kBackLeft].getTicsSpeed()) /
+      2.0f;
+  const float rightMeasured =
+      (motor[MotorID::kFrontRight].getTicsSpeed() +
+       motor[MotorID::kBackRight].getTicsSpeed()) /
+      2.0f;
+
+  const float wheelDiff = leftMeasured - rightMeasured;
+  float balanceError = pidWheelBalance.calculate_PID(0.0f, wheelDiff);
+  balanceError = constrain(balanceError, -6.0f, 6.0f);
+
   if (!ahead)
     AngleError = -AngleError;
-  PID_Wheel(speedReference + AngleError, MotorID::kFrontLeft);
-  PID_Wheel(speedReference + AngleError, MotorID::kBackLeft);
-  PID_Wheel(speedReference - AngleError, MotorID::kFrontRight);
-  PID_Wheel(speedReference - AngleError, MotorID::kBackRight);
+
+  float totalCorrection = AngleError - balanceError;
+  totalCorrection = constrain(totalCorrection, -9.0f, 9.0f);
+
+  const float kCorrectionSlewPerCycle = 1.2f;
+  float correctionDelta = totalCorrection - lastTotalCorrection;
+  correctionDelta = constrain(correctionDelta, -kCorrectionSlewPerCycle,
+                              kCorrectionSlewPerCycle);
+  totalCorrection = lastTotalCorrection + correctionDelta;
+  lastTotalCorrection = totalCorrection;
+
+  const int leftReference = static_cast<int>(speedReference + totalCorrection);
+  const int rightReference = static_cast<int>(speedReference - totalCorrection);
+
+  PID_Wheel(leftReference, MotorID::kFrontLeft);
+  PID_Wheel(leftReference, MotorID::kBackLeft);
+  PID_Wheel(rightReference, MotorID::kFrontRight);
+  PID_Wheel(rightReference, MotorID::kBackRight);
 }
 
 void motors::ahead() {
-  passObstacle();
-  passObstacle(); // double verification (if obstacle still in the way rotate,
-                  // else, ignore)
+  if (justRotatedAfterTurn_) {
+    justRotatedAfterTurn_ = false;
+  } else {
+    passObstacle();
+    //passObstacle(); // double verification (if obstacle still in the way rotate,
+                    // else, ignore)
+  }
   nearWall();
   resetTics();
   int offset = 0;
@@ -96,8 +203,16 @@ void motors::ahead() {
   float distance;
   bool encoder, frontVlx;
   bool rampCaution = false;
-  float frontDistance = max(vlx[vlxID::frontLeft].getDistance(),
-                            vlx[vlxID::frontRight].getDistance());
+  float frontLeftDistance = vlx[vlxID::frontLeft].getDistance();
+  float frontRightDistance = vlx[vlxID::frontRight].getDistance();
+  float frontDistance = frontMinDistance(frontLeftDistance, frontRightDistance);
+  const float kFrontStopDistance = brakingDis + 2.0f;
+
+  if (frontDistance <= kFrontStopDistance) {
+    stop();
+    return;
+  }
+
   float backDistance;
   if (frontDistance < maxVlxDistance && frontDistance >= 1) {
     distance = frontDistance;
@@ -136,9 +251,17 @@ void motors::ahead() {
       if (isRamp())
         break;
       // limitCrash();
-      distance = (frontVlx ? max(vlx[vlxID::frontLeft].getDistance(),
-                                 vlx[vlxID::frontRight].getDistance())
-                           : vlx[vlxID::back].getDistance());
+      if (frontVlx) {
+        frontLeftDistance = vlx[vlxID::frontLeft].getDistance();
+        frontRightDistance = vlx[vlxID::frontRight].getDistance();
+        distance = frontMinDistance(frontLeftDistance, frontRightDistance);
+        if (distance <= kFrontStopDistance) {
+          stop();
+          break;
+        }
+      } else {
+        distance = vlx[vlxID::back].getDistance();
+      }
       float missingDistance = abs(distance - targetDistance);
       float speed;
       speed = map(missingDistance, kTileLength, 0, kMaxSpeedFormard,
@@ -168,6 +291,13 @@ void motors::ahead() {
         break;
       if (isRamp())
         break;
+      frontLeftDistance = vlx[vlxID::frontLeft].getDistance();
+      frontRightDistance = vlx[vlxID::frontRight].getDistance();
+      frontDistance = frontMinDistance(frontLeftDistance, frontRightDistance);
+      if (frontDistance <= kFrontStopDistance) {
+        stop();
+        break;
+      }
       float missingDistance =
           kTileLength - (getAvergeTics() * kTileLength / kTicsPerTile);
       float speed = map(missingDistance, kTileLength, 0, kMaxSpeedFormard,
@@ -242,8 +372,10 @@ void motors::passObstacle() {
 
   if (!leftBlocked && !rightBlocked)
     return; // No obstacle, do nothing
-  if (leftBlocked && rightBlocked)
+  if (leftBlocked && rightBlocked) {
+    stop();
     return; // Completely blocked, can't pass
+  }
 
   moveDistance(kTileLength / 5, false);
   limitColition = true;
@@ -260,42 +392,10 @@ void motors::passObstacle() {
   rotate(targetAngle_);
   limitColition = false;
 }
-/*
 void motors::limitCrash(){
-    float targetAngle_=targetAngle;
-    bool leftState=limitSwitch_[LimitSwitchID::kLeft].getState();
-    bool rightState=limitSwitch_[LimitSwitchID::kRight].getState();
-    if(slope) return;
-    if(rampState!=0 ){
-        if(leftState || rightState) limitColition=true;
-        return;
-    }
-    if((leftState && rightState) || (!leftState && !rightState)){
-        return;
-    }
-    else if(rightState){
-        screenPrint("RightLimit");
-        Serial.println("rightlimit");
-        if(targetAngle==360){
-            targetAngle=0;
-        }
-        rotate(targetAngle+25);
-    }else if(leftState){
-        screenPrint("leftLimit");
-        Serial.println("rightlimit");
-        if(targetAngle==0){
-            targetAngle=360;
-        }
-        rotate(targetAngle-25);
-    }
-    delay(300);
-    moveDistance(kTileLength/6,false);
-    delay(300);
-    targetAngle=targetAngle_;
-    rotate(targetAngle);
-    limitColition=false;
+  return;
 }
-*/
+
 uint8_t motors::findNearest(float number, const uint8_t numbers[], uint8_t size,
                             bool frontVlx) {
   if (frontVlx)
@@ -316,18 +416,12 @@ uint8_t motors::findNearest(float number, const uint8_t numbers[], uint8_t size,
 void motors::back() { setback(); }
 void motors::right() {
   Serial.println("right");
-  targetAngle = targetAngle + 90;
+  targetAngle = normalize360(targetAngle + 90.0f);
   rotate(targetAngle);
-  if (targetAngle == 360) {
-    targetAngle = 0;
-  }
 }
 void motors::left() {
   Serial.println("left");
-  if (targetAngle == 0) {
-    targetAngle = 360;
-  }
-  targetAngle = targetAngle - 90;
+  targetAngle = normalize360(targetAngle - 90.0f);
   rotate(targetAngle);
 }
 
@@ -344,45 +438,42 @@ float motors::calculateAngularDistance() {
                                                        : -leftAngularDistance;
 }
 void motors::rotate(float deltaAngle) {
-  String print = "Turn " + static_cast<String>(deltaAngle);
-  // screenPrint(print);
-  targetAngle = deltaAngle;
-  delayMicroseconds(1);
-  bno.getOrientationX();
-  float currentAngle, rightAngularDistance, leftAngularDistance, minInterval,
-      maxInterval, tolerance = 2;
-  bool hexadecimal;
-  // calculate angular distance in both directions
-  if (targetAngle >= angle) {
-    rightAngularDistance = targetAngle - angle;
-    leftAngularDistance = angle + (360 - targetAngle);
-  } else {
-    rightAngularDistance = (360 - angle) + targetAngle;
-    leftAngularDistance = angle - targetAngle;
-  }
-  // define target interval and use angle or z_rotation
-  if (targetAngle != 360 && targetAngle != 0) {
-    minInterval = (targetAngle - tolerance),
-    maxInterval = (targetAngle + tolerance);
-    hexadecimal = true;
-  } else {
-    targetAngle = 0;
-    minInterval = -tolerance, maxInterval = tolerance;
-    hexadecimal = false;
-  }
-  // decide shortest route and rotate
-  (rightAngularDistance <= leftAngularDistance) ? (setright()) : (setleft());
+  targetAngle = normalize360(deltaAngle);
+  const unsigned long kTurnTimeoutMs = 2800;
+  const unsigned long startTime = millis();
 
-  currentAngle = hexadecimal ? angle : z_rotation;
-  while (currentAngle < minInterval || currentAngle > maxInterval) {
-    changeSpeedMove(false, true, 0, false);
+  bno.getOrientationX();
+  turnPID_.reset(angle, targetAngle, millis());
+
+  while (true) {
     bno.getOrientationX();
-    currentAngle = hexadecimal ? angle : z_rotation;
-    if (buttonPressed)
+    const unsigned long now = millis();
+
+    if (turnPID_.isSettled(targetAngle, angle, now)) {
       break;
-    // Serial.println(angle);
+    }
+
+    const int16_t turnCommand = turnPID_.update(targetAngle, angle, now);
+
+    if (turnCommand > 0) {
+      setright();
+    } else if (turnCommand < 0) {
+      setleft();
+    } else {
+      stop();
+      continue;
+    }
+
+    int turnSpeed = abs(turnCommand);
+    PID_AllWheels(turnSpeed);
+
+    if (buttonPressed || (now - startTime) > kTurnTimeoutMs) {
+      break;
+    }
   }
+
   stop();
+  justRotatedAfterTurn_ = true;
   inMotion = true;
 }
 
@@ -498,7 +589,7 @@ double motors::getAvergeTics() {
   return totalTics / 4;
 }
 double motors::getTicsSpeed() {
-  float ticsSpeed;
+  float ticsSpeed = 0;
   for (int i = 0; i < 4; i++) {
     ticsSpeed += motor[i].getTicsSpeed();
   }
@@ -572,22 +663,24 @@ bool motors::isWall(uint8_t direction) {
     break;
   }
   uint8_t realPos = rulet[relativeDir][direction];
-  bool frontLeft = vlx[vlxID::frontLeft].isWall();
-  bool frontRight = vlx[vlxID::frontRight].isWall();
-  bool right = vlx[vlxID::right].isWall();
-  bool back = vlx[vlxID::back].isWall();
-  bool left = vlx[vlxID::left].isWall();
+  constexpr float kWallThresholdCm = 22.0f;
+
+  const float frontLeft = stableDistance(vlx[vlxID::frontLeft]);
+  const float frontRight = stableDistance(vlx[vlxID::frontRight]);
+  const float right = stableDistance(vlx[vlxID::right]);
+  const float back = stableDistance(vlx[vlxID::back]);
+  const float left = stableDistance(vlx[vlxID::left]);
 
   switch (realPos) {
   case 0:
-    // front wall if any front sensor sees obstacle, safer for turns
-    return frontLeft && frontRight;
+    // front wall if any front sensor sees obstacle, using the closer stable read
+    return frontMinDistance(frontLeft, frontRight) < kWallThresholdCm;
   case 1:
-    return right;
+    return right < kWallThresholdCm;
   case 2:
-    return back;
+    return back < kWallThresholdCm;
   case 3:
-    return left;
+    return left < kWallThresholdCm;
   default:
     return false;
   }

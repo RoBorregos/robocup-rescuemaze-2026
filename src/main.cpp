@@ -28,4 +28,6 @@ void setup() {
                   Interrups::backRightEncoder, RISING);
 }
 
-void loop() { m.run_algs(); }
+void loop() { m.run_algs();
+//robot.rotate(90);  
+}

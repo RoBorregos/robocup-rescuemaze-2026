@@ -5,16 +5,16 @@
 
 class Motor {
 private:
-  uint8_t in1;
-  uint8_t in2;
-  uint8_t enable;
-  uint16_t speed;
-  int ticsSpeed;
-  unsigned long last_time;
+  uint8_t in1 = 0;
+  uint8_t in2 = 0;
+  uint8_t enable = 0;
+  uint16_t speed = 0;
+  int ticsSpeed = 0;
+  unsigned long last_time = 0;
 
 public:
-  volatile int tics;
-  volatile int deltaTics;
+  volatile int tics = 0;
+  volatile int deltaTics = 0;
   void initialize(uint8_t, uint8_t, uint8_t, uint8_t);
   Motor();
   void updateTics();

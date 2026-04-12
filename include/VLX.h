@@ -2,7 +2,6 @@
 #define VLX_H
 #include "MUX.h"
 #include "Pins_ID.h"
-#include "SingleEMAFilter.h"
 #include <Adafruit_Sensor.h>
 #include <Adafruit_VL53L0X.h>
 #include <Arduino.h>
@@ -11,8 +10,6 @@
 class VLX {
 private:
   MUX mux_;
-  SingleEMAFilter<float> distanceFilter_{0.25};
-  bool hasFilteredDistance_ = false;
   static constexpr uint8_t kMaxInitAttempts_ = 5;
   static constexpr uint32_t kTimingBudget = 33000;
 

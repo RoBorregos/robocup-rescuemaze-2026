@@ -16,7 +16,6 @@ void VLX::begin() {
   }
   VLX_.setMeasurementTimingBudgetMicroSeconds(kTimingBudget);
   VLX_.startRangeContinuous(100);
-  hasFilteredDistance_ = false;
   Serial.println("VL53L0X inicilaized properly.");
 }
 
@@ -33,29 +32,17 @@ float VLX::getDistance() {
   }
 
   if (status != 4) {
-    const float distanceCm = static_cast<float>(rawRange) / 10.0f;
-    if (!hasFilteredDistance_) {
-      distance = distanceCm;
-      hasFilteredDistance_ = true;
-    } else {
-      distance = distanceFilter_.addValue(distanceCm);
-    }
+    distance = (float)(rawRange) / 10.0f;
     return distance;
   } else {
     rawRange = VLX_.readRange();
     status = VLX_.readRangeStatus();
     if (status != 4) {
-      const float distanceCm = static_cast<float>(rawRange) / 10.0f;
-      if (!hasFilteredDistance_) {
-        distance = distanceCm;
-        hasFilteredDistance_ = true;
-      } else {
-        distance = distanceFilter_.addValue(distanceCm);
-      }
+      distance = (float)(rawRange) / 10.0f;
       return distance;
     }
   }
-  return hasFilteredDistance_ ? distance : 819.0f;
+  return 819.0f;
 }
 
 void VLX::printDistance() {

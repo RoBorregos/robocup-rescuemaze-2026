@@ -3,6 +3,7 @@
 #include "BNO.H"
 #include "PID.h"
 #include "TCS.h"
+#include "TurnPID.h"
 #include "VLX.h"
 #include "LimitSwitch.h"
 #include "motor.h"
@@ -34,6 +35,7 @@ private:
   float targetAngle = 0;
   static constexpr unsigned long delayTime = 350;
   PID myPID[4];
+  TurnPID turnPID_;
   // vlx
   static constexpr uint8_t kNumVlx = 8;
   static constexpr uint8_t maxVlxDistance = 68;
@@ -93,6 +95,7 @@ private:
   static constexpr char kCheckpointColor = 'C';
   // movement
   bool limitColition = false;
+  bool justRotatedAfterTurn_ = false;
   // servo
   float servoPos = 90;
   static constexpr uint16_t servoPosRight = 133;
