@@ -8,6 +8,8 @@ private:
   float kd;
   float last_error;
   float last_time;
+  float accumulated_error = 0.0f;
+  static constexpr float MAX_INTEGRAL = 100.0f;
 
 public:
   PID(float, float, float, float);

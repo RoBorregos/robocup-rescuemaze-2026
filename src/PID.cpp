@@ -18,16 +18,18 @@ void PID::changeConstants(float kp_, float ki_, float kd_,
   ki = ki_;
   kd = kd_;
   calculate_time = calculate_time_;
+  accumulated_error = 0.0f;  // Reset integral on reconfiguration
 }
 double PID::calculate_PID(float setpoint, float input) {
   float current_time = millis();
   float delta_time = current_time - last_time;
   if (delta_time >= calculate_time) {
     float error = setpoint - input;
-    float total_error = error + last_error;
+    accumulated_error += error;
+    accumulated_error = constrain(accumulated_error, -MAX_INTEGRAL, MAX_INTEGRAL);
 
     float proportional = kp * error;
-    float integral = ki * total_error;
+    float integral = ki * accumulated_error;
     float derivative = kd * (error - last_error) / (delta_time);
     float output = proportional + integral + derivative;
     last_error = error;
