@@ -47,7 +47,7 @@ void BNO::setupBNO() {
   bno_.setExtCrystalUse(true);
   updateBNO(event_);
   filteredAngleX_ = normalizeAngle360(event_.orientation.x);
-  filteredAngleY_ = event_.orientation.y;
+  filteredAngleY_ = event_.orientation.z;
   Serial.println("BNO055 initialized successfully");
 }
 
@@ -67,7 +67,7 @@ float BNO::getOrientationX() {
 
 float BNO::getOrientationY() {
   updateBNO(event_);
-  float rawY = event_.orientation.y - phaseCorrectionY_;
+  float rawY = event_.orientation.z - phaseCorrectionY_;
   return filterValue(rawY, filteredAngleY_, orientationFilterAlpha_);
 }
 

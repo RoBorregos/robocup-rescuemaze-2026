@@ -83,7 +83,8 @@ void motors::setupMotors() {
 
   rampUpPID.changeConstants(kP_RampUp, kI_RampUp, kD_RampUp, rampTime);
   rampDownPID.changeConstants(kP_RampDown, kI_RampDown, kD_RampDown, rampTime);
-
+  limitSwitch_[LimitSwitchID::kLeft].initLimitSwitch(Pins::limitSwitchPins[LimitSwitchID::kLeft]);
+  limitSwitch_[LimitSwitchID::kRight].initLimitSwitch(Pins::limitSwitchPins[LimitSwitchID::kRight]);
   targetAngle = 0;
   delay(500);
 }
@@ -189,13 +190,8 @@ void motors::pidEncoders(int speedReference, bool ahead) {
 }
 
 void motors::ahead() {
-  if (justRotatedAfterTurn_) {
-    justRotatedAfterTurn_ = false;
-  } else {
     passObstacle();
-    //passObstacle(); // double verification (if obstacle still in the way rotate,
-                    // else, ignore)
-  }
+
   nearWall();
   resetTics();
   int offset = 0;
@@ -205,7 +201,7 @@ void motors::ahead() {
   bool rampCaution = false;
   float frontLeftDistance = vlx[vlxID::frontLeft].getDistance();
   float frontRightDistance = vlx[vlxID::frontRight].getDistance();
-  float frontDistance = frontMinDistance(frontLeftDistance, frontRightDistance);
+  float frontDistance = max(frontLeftDistance, frontRightDistance);
   const float kFrontStopDistance = brakingDis + 2.0f;
 
   if (frontDistance <= kFrontStopDistance) {
@@ -232,10 +228,10 @@ void motors::ahead() {
   // robot.screenPrint(print);
   if (frontDistance > 800)
     rampCaution = true;
-  if (abs(bno.getOrientationY()) > 15) {
-    encoder = true;
-    offset = kTicsPerTile / 6;
-  }
+  // if (abs(bno.getOrientationY()) > 15) {
+  //   encoder = true;
+  //   offset = kTicsPerTile / 6;
+  // }
   if (!encoder) {
     float targetDistance = findNearest(
         distance, frontVlx ? targetDistances : targetDistancesB, 2, frontVlx);
@@ -250,11 +246,11 @@ void motors::ahead() {
         break;
       if (isRamp())
         break;
-      // limitCrash();
+      limitCrash();
       if (frontVlx) {
         frontLeftDistance = vlx[vlxID::frontLeft].getDistance();
         frontRightDistance = vlx[vlxID::frontRight].getDistance();
-        distance = frontMinDistance(frontLeftDistance, frontRightDistance);
+        distance = max(frontLeftDistance, frontRightDistance);
         if (distance <= kFrontStopDistance) {
           stop();
           break;
@@ -283,7 +279,7 @@ void motors::ahead() {
   } else if (encoder) {
     while (getAvergeTics() < kTicsPerTile - offset) {
       setahead();
-      // limitCrash();
+      limitCrash();
       // checkTileColor();
       if (blackTile)
         return;
@@ -293,7 +289,7 @@ void motors::ahead() {
         break;
       frontLeftDistance = vlx[vlxID::frontLeft].getDistance();
       frontRightDistance = vlx[vlxID::frontRight].getDistance();
-      frontDistance = frontMinDistance(frontLeftDistance, frontRightDistance);
+      frontDistance = max(frontLeftDistance, frontRightDistance);
       if (frontDistance <= kFrontStopDistance) {
         stop();
         break;
@@ -379,21 +375,52 @@ void motors::passObstacle() {
 
   moveDistance(kTileLength / 5, false);
   limitColition = true;
-  if (leftBlocked || rightBlocked) {
-    float sideAngle = targetAngle + (leftBlocked ? 25 : -25);
-    if (sideAngle >= 360)
-      sideAngle -= 360;
-    if (sideAngle < 0)
-      sideAngle += 360;
+  sideAngle = targetAngle + (leftBlocked ? 25 : -25);
+  if (sideAngle >= 360)
+    sideAngle -= 360;
+  if (sideAngle < 0)
+    sideAngle += 360;
 
-    rotate(sideAngle);
-    moveDistance(3 * kTileLength / 10, true);
-  }
+  rotate(sideAngle);
+  moveDistance(3 * kTileLength / 10, true);
   rotate(targetAngle_);
   limitColition = false;
 }
-void motors::limitCrash(){
-  return;
+void motors::limitCrash() {
+  if (slope) return;
+  float targetAngle_ = targetAngle;
+  bool leftState = limitSwitch_[LimitSwitchID::kLeft].getState();
+  bool rightState = limitSwitch_[LimitSwitchID::kRight].getState();
+
+  if (leftState || rightState) {
+    delay(30);
+    if ((leftState != limitSwitch_[LimitSwitchID::kLeft].getState()) ||
+        (rightState != limitSwitch_[LimitSwitchID::kRight].getState())) {
+      leftState = limitSwitch_[LimitSwitchID::kLeft].getState();
+      rightState = limitSwitch_[LimitSwitchID::kRight].getState();
+    }
+
+    if (rampState != 0) {
+      if (leftState || rightState) limitColition = true;
+      return;
+    }
+
+    if (!leftState && !rightState) return;
+
+    moveDistance(kTileLength / 5, false);
+
+    float sideAngle = targetAngle + (leftState ? 25 : -25);
+    if (sideAngle >= 360) sideAngle -= 360;
+    if (sideAngle < 0) sideAngle += 360;
+    moveDistance(kTileLength / 5, false);
+    rotate(sideAngle);
+    moveDistance(3 * kTileLength / 10, true);
+
+    rotate(targetAngle_);
+    limitColition = false;
+    resetTics();   // <-- reset so encoder loop restarts correctly
+    setahead();    // <-- resume forward motion
+  }
 }
 
 uint8_t motors::findNearest(float number, const uint8_t numbers[], uint8_t size,
@@ -674,7 +701,7 @@ bool motors::isWall(uint8_t direction) {
   switch (realPos) {
   case 0:
     // front wall if any front sensor sees obstacle, using the closer stable read
-    return frontMinDistance(frontLeft, frontRight) < kWallThresholdCm;
+    return frontLeft < kWallThresholdCm && frontRight < kWallThresholdCm;
   case 1:
     return right < kWallThresholdCm;
   case 2:

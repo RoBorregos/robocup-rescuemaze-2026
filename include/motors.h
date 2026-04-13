@@ -21,7 +21,7 @@
 #define PCA9548A_ADDR 0x70      // PCA9548A Direction
 #define PCA9548A_CHANNEL_4 0x20 // Canal 4 (SDA4/SCL4)
 
-constexpr uint8_t edgeTileDistance = 8;
+constexpr uint8_t edgeTileDistance = 10;
 constexpr uint8_t kTileLength = 30;
 constexpr uint8_t rulet[4][4] = {
     {0, 1, 2, 3}, {3, 0, 1, 2}, {2, 3, 0, 1}, {1, 2, 3, 0}};
