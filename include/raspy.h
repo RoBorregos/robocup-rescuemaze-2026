@@ -43,9 +43,9 @@
 #define UART_CHECKSUM_MASK 0xFF
 
 // Detection constants
-#define DETECTION_ATTEMPTS 3
-#define DETECTION_MIN_CONSENSUS 2
-#define DETECTION_ATTEMPT_DELAY_MS 50
+#define DETECTION_ATTEMPTS 1
+#define DETECTION_MIN_CONSENSUS 1
+#define DETECTION_ATTEMPT_DELAY_MS 10
 
 // Display constants
 #define DISPLAY_LINE_SIZE 20
@@ -79,7 +79,7 @@ public:
   uint8_t victim;
   uint8_t left_victim;
   uint8_t right_victim;
-  uint32_t waitingTime = 5000; // 5 seconds waiting for response
+  uint32_t waitingTime = 300; // 5 seconds waiting for response
 
 private:
   // Packet parsing states
