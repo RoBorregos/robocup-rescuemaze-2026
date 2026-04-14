@@ -190,7 +190,8 @@ void motors::pidEncoders(int speedReference, bool ahead) {
 }
 
 void motors::ahead() {
-    passObstacle();
+  passObstacle();
+  passObstacle();
 
   nearWall();
   resetTics();
@@ -202,7 +203,7 @@ void motors::ahead() {
   float frontLeftDistance = vlx[vlxID::frontLeft].getDistance();
   float frontRightDistance = vlx[vlxID::frontRight].getDistance();
   float frontDistance = max(frontLeftDistance, frontRightDistance);
-  const float kFrontStopDistance = brakingDis + 2.0f;
+  const float kFrontStopDistance = 4.0f;
 
   if (frontDistance <= kFrontStopDistance) {
     stop();
@@ -214,13 +215,14 @@ void motors::ahead() {
     distance = frontDistance;
     encoder = false;
     frontVlx = true;
-  } else {
+  } /*else {
     backDistance = vlx[vlxID::back].getDistance();
     if ((backDistance < maxVlxDistance - kTileLength) && frontDistance >= 1) {
       distance = backDistance;
       encoder = false;
       frontVlx = false;
-    } else
+      
+    } */else{
       encoder = true;
   }
 
@@ -275,6 +277,7 @@ void motors::ahead() {
                     kMinSpeedFormard);
       speed = constrain(speed, kMinSpeedFormard, kMaxSpeedFormard);
       pidEncoders(speed, true);
+      screenPrint(String(distance));
     }
   } else if (encoder) {
     while (getAvergeTics() < kTicsPerTile - offset) {
@@ -392,20 +395,21 @@ void motors::limitCrash() {
   bool leftState = limitSwitch_[LimitSwitchID::kLeft].getState();
   bool rightState = limitSwitch_[LimitSwitchID::kRight].getState();
 
-  if (leftState || rightState) {
     delay(30);
     if ((leftState != limitSwitch_[LimitSwitchID::kLeft].getState()) ||
         (rightState != limitSwitch_[LimitSwitchID::kRight].getState())) {
       leftState = limitSwitch_[LimitSwitchID::kLeft].getState();
       rightState = limitSwitch_[LimitSwitchID::kRight].getState();
     }
+    
+    if (!leftState && !rightState) return;
+
+    if (leftState && rightState) stop(); return;
 
     if (rampState != 0) {
       if (leftState || rightState) limitColition = true;
       return;
     }
-
-    if (!leftState && !rightState) return;
 
     moveDistance(kTileLength / 5, false);
 
@@ -420,7 +424,6 @@ void motors::limitCrash() {
     limitColition = false;
     resetTics();   // <-- reset so encoder loop restarts correctly
     setahead();    // <-- resume forward motion
-  }
 }
 
 uint8_t motors::findNearest(float number, const uint8_t numbers[], uint8_t size,
@@ -610,10 +613,9 @@ void motors::resetTics() {
 }
 double motors::getAvergeTics() {
   float totalTics = 0;
-  for (int i = 0; i < 4; i++) {
-    totalTics += motor[i].tics;
-  }
-  return totalTics / 4;
+    totalTics += motor[MotorID::kBackLeft].tics;
+    totalTics += motor[MotorID::kFrontRight].tics;
+  return totalTics / 2;
 }
 double motors::getTicsSpeed() {
   float ticsSpeed = 0;
@@ -760,7 +762,7 @@ void motors::ramp() {
         (vlx[vlxID::right].distance < 6 || vlx[vlxID::left].distance < 6)) {
       error = rampUpPID.calculate_PID(
           0, (vlx[vlxID::right].distance - vlx[vlxID::left].distance));
-      error = constrain(error, -15, 15);
+      error = constrain(error, -40, 40);
       PID_Wheel(kSpeedRampUp - error, MotorID::kFrontLeft);
       PID_Wheel(kSpeedRampUp - error, MotorID::kBackLeft);
       PID_Wheel(kSpeedRampUp + error, MotorID::kFrontRight);

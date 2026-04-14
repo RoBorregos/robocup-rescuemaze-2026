@@ -1,59 +1,60 @@
 #include "VLX.h"
-#include <Arduino.h>
-#include <Wire.h>
 
-VLX::VLX() {}
+VLX::VLX(){
 
-VLX::VLX(const uint8_t posMux) { mux_.setNewChannel(posMux); }
-
-void VLX::begin() {
-  mux_.selectChannel();
-  VLX_.begin();
-  if (!VLX_.begin()) {
-    Serial.println("Error on sensor VL53L0X!");
-    while (1)
-      ;
-  }
-  VLX_.setMeasurementTimingBudgetMicroSeconds(kTimingBudget);
-  VLX_.startRangeContinuous(100);
-  Serial.println("VL53L0X inicilaized properly.");
+}
+VLX::VLX(const uint8_t posMux){
+    mux_.setNewChannel(posMux);
 }
 
-void VLX::setMux(const uint8_t posMux) { mux_.setNewChannel(posMux); }
-
-float VLX::getDistance() {
-  mux_.selectChannel();
-
-  uint16_t rawRange = VLX_.readRange();
-  uint16_t status = VLX_.readRangeStatus();
-  if (VLX_.timeoutOccurred()) {
-    // preserve previous valid distance if timeout
-    return distance;
-  }
-
-  if (status != 4) {
-    distance = (float)(rawRange) / 10.0f;
-    return distance;
-  } else {
-    rawRange = VLX_.readRange();
-    status = VLX_.readRangeStatus();
-    if (status != 4) {
-      distance = (float)(rawRange) / 10.0f;
-      return distance;
+void VLX::begin(){
+    mux_.selectChannel();
+    VLX_.begin();
+    if (!VLX_.begin()) {
+        Serial.println("¡Error al iniciar el sensor VL53L0X!");
+        while (1);
     }
-  }
-  return 819.0f;
+    Serial.println("VL53L0X iniciado correctamente.");  
 }
 
-void VLX::printDistance() {
-  float printedDistance = getDistance();
-  if (printedDistance != 819.0) {
-    Serial.print("Distance: ");
-    Serial.print(distance);
-    Serial.println(" mm");
-  } else {
-    Serial.println("Out of range.");
-  }
+void VLX::setMux(const uint8_t posMux) {
+    mux_.setNewChannel(posMux);
+}
+void VLX::updateDistance() {
+    mux_.selectChannel();
+    VLX_.rangingTest(&measure, false);
+}
+float VLX::getDistance(){
+    updateDistance();
+    if (measure.RangeStatus != 4) {
+    distance=measure.RangeMilliMeter;
+    distance=distance/10;
+    return distance;
+    }else{
+        updateDistance();
+        if (measure.RangeStatus != 4) {
+        distance=measure.RangeMilliMeter;
+        distance=distance/10;
+        return distance;
+        }
+    }
 }
 
-bool VLX::isWall() { return (getDistance() < kDistanceToWall); }
+void VLX::printDistance(){
+    updateDistance();
+    if (measure.RangeStatus != 4) {
+        Serial.print("Distance: ");
+        Serial.print(measure.RangeMilliMeter);
+        Serial.println(" mm");
+    } else {
+        Serial.println("Fuera de rango.");
+    }
+    delay(500); 
+    }
+bool VLX::isWall(){
+    if(getDistance()<kDistanceToWall){
+        return true;
+    }else{
+        return false;
+    }
+}

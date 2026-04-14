@@ -21,7 +21,7 @@
 #define PCA9548A_ADDR 0x70      // PCA9548A Direction
 #define PCA9548A_CHANNEL_4 0x20 // Canal 4 (SDA4/SCL4)
 
-constexpr uint8_t edgeTileDistance = 10;
+constexpr uint8_t edgeTileDistance = 9;
 constexpr uint8_t kTileLength = 30;
 constexpr uint8_t rulet[4][4] = {
     {0, 1, 2, 3}, {3, 0, 1, 2}, {2, 3, 0, 1}, {1, 2, 3, 0}};
@@ -38,7 +38,7 @@ private:
   TurnPID turnPID_;
   // vlx
   static constexpr uint8_t kNumVlx = 8;
-  static constexpr uint8_t maxVlxDistance = 68;
+  static constexpr uint8_t maxVlxDistance = 46;
   static constexpr uint8_t brakingDis = 5;
   static constexpr uint8_t kDistanceToWall = 12;
   static constexpr uint8_t kDistanceToObstacle = 20;
@@ -57,7 +57,7 @@ private:
   uint16_t kMaxSpeedRotate = 40 * 3;
   static constexpr uint16_t kMinSpeedFormard = 30 * 5;
   static constexpr uint16_t kMaxSpeedFormard = 45 * 5;
-  static constexpr uint16_t kSpeedRampUp = 20 * 5;
+  static constexpr uint16_t kSpeedRampUp = 20 * 3;
   static constexpr uint16_t kSpeedRampDown = 15 * 5;
   static constexpr uint16_t kSpeedCorrection = 0;
   static constexpr uint16_t kSpeedLeftCorrection = 0;
@@ -66,7 +66,7 @@ private:
   PID rampDownPID;
   PID pidBno;
   bool slope = false;
-  static constexpr float kMinRampOrientation = 18.0;
+  static constexpr float kMinRampOrientation = 12.0;
   // control Walls
   static constexpr float minDisToLateralWall = 5;
   static constexpr float DisToSideWall = 20;
@@ -84,9 +84,9 @@ private:
   static constexpr float kD_RampDown = 0.03;
   static constexpr uint8_t rampTime = 20;
   // ramp Up constants
-  static constexpr float kP_RampUp = 0.2;
+  static constexpr float kP_RampUp = 13;
   static constexpr float kI_RampUp = 0.01;
-  static constexpr float kD_RampUp = 0.1;
+  static constexpr float kD_RampUp = 1.8;
   // TCS
   char tileColor;
   static constexpr char kBlueColor = 'B';
