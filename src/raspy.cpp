@@ -59,9 +59,10 @@ uint8_t Raspy::getDetection() {
   victim = VICTIM_NONE;
   left_victim = VICTIM_NONE;
   right_victim = VICTIM_NONE;
-  const int min_consensus_required =
-      (DETECTION_MIN_CONSENSUS > DETECTION_ATTEMPTS) ? DETECTION_ATTEMPTS
-                                                      : DETECTION_MIN_CONSENSUS;
+  int min_consensus_required = DETECTION_MIN_CONSENSUS;
+  if (min_consensus_required > DETECTION_ATTEMPTS) {
+    min_consensus_required = DETECTION_ATTEMPTS;
+  }
 
   // Make DETECTION_ATTEMPTS attempts for RIGHT camera
   uint8_t right_results[DETECTION_ATTEMPTS] = {0};
