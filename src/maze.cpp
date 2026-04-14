@@ -1,5 +1,6 @@
 #include "maze.h"
 #include "Arduino.h"
+#include "raspy.h"
 
 coord inicio = {kBaseCoord, kBaseCoord, kBaseCoord};
 coord robotCoord = {kBaseCoord, kBaseCoord, kBaseCoord};
@@ -37,19 +38,30 @@ void MazeDebugCoord(const char *label, const coord &value) {
 
 maze::maze() {}
 // logic
-/*
-void detection(Tile* curr){
-  if(!curr -> hasVictim()){
-        if(robot.buttonPressed) return;
-        if(robot.victim == 1) robot.harmedVictim();
-        else if(robot.victim == 2) robot.stableVictim();
-        else if(robot.victim == 3) robot.unharmedVictim();
-        if(robot.victim != 0) curr -> setVictim();
-        robot.victim = 0;
-        robot.kitState=kitID::kNone;
+void detection(Tile* curr) {
+    if (!curr->hasVictim()) {
+        uint8_t result = raspy.getDetection();
+        if (robot.buttonPressed) return;
 
+        switch (result) {
+            // Targets de color
+            case VICTIM_HARMED:    robot.harmedVictim();   break;
+            case VICTIM_STABLE:    robot.stableVictim();   break;
+            case VICTIM_UNHARMED:  robot.unharmedVictim(); break;
+            // Letras (PHI=H, PSI=S, OMEGA=U)
+            case VICTIM_PHI:       robot.harmedVictim();   break;
+            case VICTIM_PSI:       robot.stableVictim();   break;
+            case VICTIM_OMEGA:     robot.unharmedVictim(); break;
+            // Fake o ninguno: ignorar
+            case VICTIM_FAKE_TARGET: return;
+            default:               return;
+        }
+
+        curr->setVictim();
+        if (raspy.camera == CAM_RIGHT)     robot.kitState = kitID::kRight;
+        else if (raspy.camera == CAM_LEFT) robot.kitState = kitID::kLeft;
     }
-}  */
+}
 
 void maze::followPath(Stack &path, arrCustom<Tile> &tiles,
                       arrCustom<coord> &tilesMap) {
@@ -61,74 +73,54 @@ void maze::followPath(Stack &path, arrCustom<Tile> &tiles,
     MazeDebugCoord("followPath next", next);
     path.pop();
     if (next.x > robotCoord.x) {
-      // if(robotOrientation != 90) detection(curr);
-      if (robotOrientation == 270)
-        robot.rotate(180);
-      if (robot.buttonPressed)
-        break; /* detection(curr); */
+      if (robotOrientation != 90) detection(curr);
+      if (robotOrientation == 270) robot.rotate(180);
+      if (robot.buttonPressed) break;
+      detection(curr);
       robot.rotate(90);
-      if (robot.buttonPressed)
-        break;
-      else
-        robot.rotate(90);
-      if (robot.buttonPressed)
-        break; /* detection(curr); */
+      if (robot.buttonPressed) break;
+      else robot.rotate(90);
+      if (robot.buttonPressed) break;
+      detection(curr);
       robotOrientation = 90;
     } else if (next.x < robotCoord.x) {
-      // if(robotOrientation != 270) detection(curr);
-      if (robotOrientation == 90)
-        robot.rotate(180);
-      if (robot.buttonPressed)
-        break; /* detection(curr); */
+      if (robotOrientation != 270) detection(curr);
+      if (robotOrientation == 90) robot.rotate(180);
+      if (robot.buttonPressed) break;
+      detection(curr);
       robot.rotate(270);
-      if (robot.buttonPressed)
-        break;
-      else
-        robot.rotate(270);
-      if (robot.buttonPressed)
-        break; /* detection(curr); */ // case in which the robot has to go
-                                      // backwards in a dead end
+      if (robot.buttonPressed) break;
+      else robot.rotate(270);
+      if (robot.buttonPressed) break;
+      detection(curr);
       robotOrientation = 270;
     } else if (next.y > robotCoord.y) {
-      // if(robotOrientation != 0) detection(curr);
-      if (robotOrientation == 180)
-        robot.rotate(90);
-      if (robot.buttonPressed)
-        break; /* detection(curr); */
+      if (robotOrientation != 0) detection(curr);
+      if (robotOrientation == 180) robot.rotate(90);
+      if (robot.buttonPressed) break;
+      detection(curr);
       robot.rotate(0);
-      if (robot.buttonPressed)
-        break;
-      else
-        robot.rotate(0);
-      if (robot.buttonPressed)
-        break; /* detection(curr); */ // case in which the robot has to go
-                                      // backwards in a dead end
+      if (robot.buttonPressed) break;
+      else robot.rotate(0);
+      if (robot.buttonPressed) break;
+      detection(curr);
       robotOrientation = 0;
     } else if (next.y < robotCoord.y) {
-      // if(robotOrientation != 180) detection(curr); //cases in which the robot
-      // has to turn 180 degrees to follow the path, so we want to detect before
-      // turning in case there is a victim in the current tile
-      if (robotOrientation == 0)
-        robot.rotate(90);
-      if (robot.buttonPressed)
-        break; /* detection(curr); */
+      if (robotOrientation != 180) detection(curr);
+      if (robotOrientation == 0) robot.rotate(90);
+      if (robot.buttonPressed) break;
+      detection(curr);
       robot.rotate(180);
-      if (robot.buttonPressed)
-        break; // case in which the robot has to go backwards in a dead end
-      else
-        robot.rotate(180);
-      if (robot.buttonPressed)
-        break; /* detection(curr); */ // normal case in which the robot has to
-                                      // follow a path
+      if (robot.buttonPressed) break;
+      else robot.rotate(180);
+      if (robot.buttonPressed) break;
+      detection(curr);
       robotOrientation = 180;
     }
-    if (robot.buttonPressed)
-      break;
+    if (robot.buttonPressed) break;
     robot.ahead();
-    if (robot.buttonPressed)
-      break;
-    if (robot.blackTile)
-      continue;
+    if (robot.buttonPressed) break;
+    if (robot.blackTile) continue;
     past = robotCoord;
     robotCoord = next;
     curr = &tiles.getValue(tilesMap.getIndex(next));
