@@ -26,9 +26,9 @@ constexpr uint8_t limitSwitchPins[2] = {
 };
 constexpr uint8_t servos[2] = {
     18, // LEFT
-    12  // RIGHT
+    19  // RIGHT
 };
-constexpr uint8_t checkpointPin = 19;
+constexpr uint8_t checkpointPin = 0;
 constexpr uint8_t LedsPin = 12;
 
 } // namespace Pins
@@ -42,7 +42,7 @@ constexpr uint8_t frontLeft = 3;
 constexpr uint8_t frontRight = 0;
 // constexpr uint8_t rightDown=1;
 constexpr uint8_t right = 4;
-constexpr uint8_t left = 2;
+constexpr uint8_t left = 5;
 // constexpr uint8_t front=4;
 // constexpr uint8_t leftDown=5; // backLeft
 constexpr uint8_t back = 1;

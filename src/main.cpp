@@ -28,4 +28,14 @@ void setup() {
                   Interrups::backRightEncoder, RISING);
 }
 
-void loop() { m.run_algs(); }
+void loop() { //m.run_algs(); 
+ 
+
+robot.kitLeft(2);
+  Serial.println("ya 1");
+  delay(2000);
+  robot.kitRight(2);
+  Serial.println("ya 2");
+  delay(2000)
+
+;}

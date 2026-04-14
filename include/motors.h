@@ -90,8 +90,8 @@ private:
   bool limitColition = false;
   // servo
   float servoPos = 180;
-  static constexpr uint16_t servoPosRight = 180;
-  static constexpr uint16_t servoPosLeft = 45;
+  static constexpr uint16_t servoPosRight = 45;
+  static constexpr uint16_t servoPosLeft = 180;
 
 public:
   // objets

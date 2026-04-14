@@ -17,7 +17,7 @@ void motors::setupMotors() {
   setupVlx(vlxID::right);
   setupVlx(vlxID::frontLeft);
   setupVlx(vlxID::back);
-  setupTCS();
+  //setupTCS();
   servo[servosID::kLeft].attach(Pins::servos[servosID::kLeft]);
   Serial.println("Servo Left attached");
   servo[servosID::kRight].attach(Pins::servos[servosID::kRight]);
