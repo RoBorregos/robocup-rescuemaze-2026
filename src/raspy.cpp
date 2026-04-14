@@ -59,10 +59,13 @@ uint8_t Raspy::getDetection() {
   victim = VICTIM_NONE;
   left_victim = VICTIM_NONE;
   right_victim = VICTIM_NONE;
+  int min_consensus_required = DETECTION_MIN_CONSENSUS;
+  if (min_consensus_required > DETECTION_ATTEMPTS) {
+    min_consensus_required = DETECTION_ATTEMPTS;
+  }
 
   // Make DETECTION_ATTEMPTS attempts for RIGHT camera
-  uint8_t right_results[DETECTION_ATTEMPTS] = {VICTIM_NONE, VICTIM_NONE,
-                                               VICTIM_NONE};
+  uint8_t right_results[DETECTION_ATTEMPTS] = {0};
   for (int i = 0; i < DETECTION_ATTEMPTS; i++) {
     if (getDetectionFromCamera(CAM_RIGHT)) {
       right_results[i] = victim;
@@ -71,8 +74,7 @@ uint8_t Raspy::getDetection() {
   }
 
   // Make DETECTION_ATTEMPTS attempts for LEFT camera
-  uint8_t left_results[DETECTION_ATTEMPTS] = {VICTIM_NONE, VICTIM_NONE,
-                                              VICTIM_NONE};
+  uint8_t left_results[DETECTION_ATTEMPTS] = {0};
   for (int i = 0; i < DETECTION_ATTEMPTS; i++) {
     if (getDetectionFromCamera(CAM_LEFT)) {
       left_results[i] = victim;
@@ -96,7 +98,7 @@ uint8_t Raspy::getDetection() {
     }
   }
   right_victim =
-      (max_count >= DETECTION_MIN_CONSENSUS) ? right_consensus : VICTIM_NONE;
+      (max_count >= min_consensus_required) ? right_consensus : VICTIM_NONE;
 
   // Find consensus for LEFT: most common result (need at least
   // DETECTION_MIN_CONSENSUS)
@@ -114,7 +116,7 @@ uint8_t Raspy::getDetection() {
     }
   }
   left_victim =
-      (max_count >= DETECTION_MIN_CONSENSUS) ? left_consensus : VICTIM_NONE;
+      (max_count >= min_consensus_required) ? left_consensus : VICTIM_NONE;
 
   // Update display with split screen: LEFT on top, RIGHT on bottom
   updateDisplaySplitScreen();
