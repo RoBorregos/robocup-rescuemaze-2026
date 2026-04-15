@@ -49,9 +49,9 @@ void detection(Tile* curr) {
             case VICTIM_STABLE:    robot.stableVictim();   break;
             case VICTIM_UNHARMED:  robot.unharmedVictim(); break;
             // Letras (PHI=H, PSI=S, OMEGA=U)
-            case VICTIM_PHI:       robot.harmedVictim();   break;
-            case VICTIM_PSI:       robot.stableVictim();   break;
-            case VICTIM_OMEGA:     robot.unharmedVictim(); break;
+          case VICTIM_PHI:       robot.phiVictim();      break;
+          case VICTIM_PSI:       robot.psiVictim();      break;
+          case VICTIM_OMEGA:     robot.omegaVictim();    break;
             // Fake o ninguno: ignorar
             case VICTIM_FAKE_TARGET: return;
             default:               return;

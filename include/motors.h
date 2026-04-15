@@ -43,7 +43,7 @@ private:
   static constexpr uint8_t kDistanceToWall = 12;
   static constexpr uint8_t kDistanceToObstacle = 20;
   // wheels
-  static constexpr float wheelDiameter = 6.8;
+  static constexpr float wheelDiameter = 7.5;
   static constexpr float distancePerRev = wheelDiameter * PI;
   static constexpr float kTicsPerRev = 496.0;
   static constexpr float kTicsPerTile = 30 * kTicsPerRev / distancePerRev;
@@ -66,7 +66,7 @@ private:
   PID rampDownPID;
   PID pidBno;
   bool slope = false;
-  static constexpr float kMinRampOrientation = 12.0;
+  static constexpr float kMinRampOrientation = 9.0;
   // control Walls
   static constexpr float minDisToLateralWall = 5;
   static constexpr float DisToSideWall = 20;
@@ -84,7 +84,7 @@ private:
   static constexpr float kD_RampDown = 0.03;
   static constexpr uint8_t rampTime = 20;
   // ramp Up constants
-  static constexpr float kP_RampUp = 13;
+  static constexpr float kP_RampUp = 15;
   static constexpr float kI_RampUp = 0.01;
   static constexpr float kD_RampUp = 1.8;
   // TCS
@@ -140,7 +140,7 @@ public:
   void setrightTraslation();
   void stop();
   void calibrateColors();
-  void victimSequency();
+  void victimSequency(const char *label = "Victim");
   // movements
   void ahead();
   void back();
@@ -164,6 +164,9 @@ public:
   void harmedVictim();
   void stableVictim();
   void unharmedVictim();
+  void phiVictim();
+  void psiVictim();
+  void omegaVictim();
   void kitRight(uint8_t);
   void kitLeft(uint8_t);
   void reloadKits();

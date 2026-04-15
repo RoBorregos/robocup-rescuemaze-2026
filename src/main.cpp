@@ -25,4 +25,8 @@ void setup() {
 
 }
 
-void loop() { m.run_algs(); }
+void loop() { 
+
+   m.run_algs(); 
+//testMotors();
+}

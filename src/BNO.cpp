@@ -82,9 +82,9 @@ void BNO::setPhaseCorrectionY(float phaseCorrectionY) {
 void BNO::resetOrientation() {
   updateBNO(event_);
   setPhaseCorrection(event_.orientation.x);
-  setPhaseCorrectionY(event_.orientation.y);
+  setPhaseCorrectionY(event_.orientation.z);
   filteredAngleX_ = normalizeAngle360(event_.orientation.x - phaseCorrection_);
-  filteredAngleY_ = event_.orientation.y - phaseCorrectionY_;
+  filteredAngleY_ = event_.orientation.z - phaseCorrectionY_;
   bno_.begin();
   delay(10);
   bno_.setExtCrystalUse(true);

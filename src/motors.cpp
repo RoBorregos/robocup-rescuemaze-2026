@@ -62,7 +62,7 @@ void motors::setupMotors() {
   Wire.begin();
   delay(10);
   Wire.setClock(400000);
-  // screenBegin();
+  screenBegin();
   bno.setupBNO();
   setupVlx(vlxID::left);
   setupVlx(vlxID::frontRight);
@@ -395,16 +395,7 @@ void motors::limitCrash() {
   bool leftState = limitSwitch_[LimitSwitchID::kLeft].getState();
   bool rightState = limitSwitch_[LimitSwitchID::kRight].getState();
 
-    delay(30);
-    if ((leftState != limitSwitch_[LimitSwitchID::kLeft].getState()) ||
-        (rightState != limitSwitch_[LimitSwitchID::kRight].getState())) {
-      leftState = limitSwitch_[LimitSwitchID::kLeft].getState();
-      rightState = limitSwitch_[LimitSwitchID::kRight].getState();
-    }
-    
     if (!leftState && !rightState) return;
-
-    if (leftState && rightState) stop(); return;
 
     if (rampState != 0) {
       if (leftState || rightState) limitColition = true;
@@ -423,7 +414,7 @@ void motors::limitCrash() {
     rotate(targetAngle_);
     limitColition = false;
     resetTics();   // <-- reset so encoder loop restarts correctly
-    setahead();    // <-- resume forward motion
+    setahead();    // <-- resume forward motionz
 }
 
 uint8_t motors::findNearest(float number, const uint8_t numbers[], uint8_t size,
@@ -725,18 +716,17 @@ bool motors::rampInFront() {
 }
 bool motors::isRamp() {
   float currentOrientationY = bno.getOrientationY();
-  // screenPrint("isRamp");
   if (abs(currentOrientationY) > 7)
     slope = true;
   if (currentOrientationY >= kMinRampOrientation ||
       currentOrientationY <= -kMinRampOrientation) {
 
     if (currentOrientationY <= -kMinRampOrientation) {
-      // screenPrint("Ramp detected");
+      screenPrint("Ramp detected");
       ramp();
       return true;
     } else if (currentOrientationY > kMinRampOrientation) {
-      // screenPrint("Ramp detected");
+      screenPrint("Ramp detected");
       ramp();
       return true;
     }
@@ -746,7 +736,7 @@ bool motors::isRamp() {
 void motors::ramp() {
   resetTics();
   setahead();
-  while (bno.getOrientationY() > 7) {
+  while (bno.getOrientationY() < -7) {
     if (buttonPressed == true)
       break;
     // limitCrash();
@@ -771,9 +761,9 @@ void motors::ramp() {
       pidEncoders(kSpeedRampUp, true);
     }
     rampState = 1;
-    screenPrint("rampUp");
+    screenPrint(String(bno.getOrientationY()));
   }
-  while (bno.getOrientationY() < -7) {
+  while (bno.getOrientationY() > 7) {
     if (buttonPressed == true)
       break;
     // limitCrash();
@@ -796,7 +786,7 @@ void motors::ramp() {
       pidEncoders(kSpeedRampDown, true);
     }
     rampState = 2;
-    // screenPrint("rampDown");
+    screenPrint("rampDown");
   }
   if (getAvergeTics() > 1 * kTicsPerTile && rampState == 1) {
     // stop();
@@ -882,10 +872,10 @@ void motors::checkpointElection() {
   return;
 }
 
-void motors::victimSequency() {
+void motors::victimSequency(const char *label) {
   float current = millis();
   while ((millis() - current) < 5100) {
-    screenPrint("Victim");
+    screenPrint(String(label));
     delay(500);
     screenPrint(" ");
     delay(500);
@@ -893,7 +883,7 @@ void motors::victimSequency() {
 }
 
 void motors::harmedVictim() {
-  victimSequency();
+  victimSequency("HARMED");
   if (kitState == kitID::kRight) {
     // screenPrint("Right");
     kitRight(2);
@@ -906,7 +896,7 @@ void motors::harmedVictim() {
 
 void motors::stableVictim() {
   // screenPrint("Stable");
-  victimSequency();
+  victimSequency("STABLE");
   if (kitState == kitID::kRight) {
     kitRight(1);
   } else if (kitState == kitID::kLeft) {
@@ -917,9 +907,29 @@ void motors::stableVictim() {
 
 void motors::unharmedVictim() {
   // screenPrint("Unharmed");
-  victimSequency();
+  victimSequency("UNHARMED");
   // screenPrint("");
 }
+
+void motors::phiVictim() {
+  victimSequency("PHI");
+  if (kitState == kitID::kRight) {
+    kitRight(2);
+  } else if (kitState == kitID::kLeft) {
+    kitLeft(2);
+  }
+}
+
+void motors::psiVictim() {
+  victimSequency("PSI");
+  if (kitState == kitID::kRight) {
+    kitRight(1);
+  } else if (kitState == kitID::kLeft) {
+    kitLeft(1);
+  }
+}
+
+void motors::omegaVictim() { victimSequency("OMEGA"); }
 
 void motors::kitLeft(uint8_t n) {
   uint16_t dt = 0;
