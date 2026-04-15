@@ -24,9 +24,11 @@ constexpr uint8_t limitSwitchPins[2] = {
     13, // LEFT
     23  // RIGHT
 };
-constexpr uint8_t servoPinR = 19;
-constexpr uint8_t servoPinL = 18;
-constexpr uint8_t checkpointPin = 19;
+constexpr uint8_t servos[2] = {
+    18, // LEFT
+    19  // RIGHT
+};
+constexpr uint8_t checkpointPin = 0;
 constexpr uint8_t LedsPin = 12;
 
 } // namespace Pins
@@ -51,6 +53,10 @@ constexpr uint8_t kRight = 2;
 constexpr uint8_t kLeft = 1;
 constexpr uint8_t kNone = 0;
 } // namespace kitID
+namespace servosID{
+constexpr uint8_t kRight = 1;
+constexpr uint8_t kLeft = 0;
+}
 namespace rampID {
 constexpr uint8_t kUp = 1;
 constexpr uint8_t kDown = 2;

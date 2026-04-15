@@ -69,7 +69,13 @@ void motors::setupMotors() {
   setupVlx(vlxID::right);
   setupVlx(vlxID::frontLeft);
   setupVlx(vlxID::back);
-  // setupTCS();
+  setupTCS();
+  servo[servosID::kLeft].attach(Pins::servos[servosID::kLeft]);
+  Serial.println("Servo Left attached");
+  servo[servosID::kRight].attach(Pins::servos[servosID::kRight]);
+  Serial.println("Servo Right attached");
+  servo[servosID::kLeft].write(servoPos);
+  servo[servosID::kRight].write(servoPosLeft);
 
   for (uint8_t i = 0; i < 4; i++) {
     motor[i].initialize(Pins::digitalOne[i], Pins::digitalTwo[i],
@@ -932,41 +938,37 @@ void motors::psiVictim() {
 void motors::omegaVictim() { victimSequency("OMEGA"); }
 
 void motors::kitLeft(uint8_t n) {
-  uint16_t dt = 0;
   for (uint8_t i = 0; i < n; i++) {
-    writeServo(servoPosRight);
-    writeServo(servoPosLeft);
-    writeServo(10);
-    writeServo(servoPosLeft);
-    writeServo(90);
+    writeServo(servoPosLeft, servosID::kLeft);
+    delay(10);
+    writeServo(servoPosRight, servosID::kLeft);
   }
 }
-void motors::writeServo(uint16_t servoAngle) {
-  servo.write(servoAngle);
-  delay(200);
-  if ((servoAngle != 10 && servoAngle != 90) && servoAngle != 170) {
-    for (uint8_t i; i < 4; i++) {
-      servo.write(servoAngle - 6);
-      delay(40);
-      servo.write(servoAngle + 6);
-      delay(40);
+void motors::writeServo(uint16_t servoAngle, uint8_t servoID) {
+  int currentAngle = servo[servoID].read();
+  int targetAngle = servoAngle;
+  if (currentAngle < targetAngle) {
+    for (int i = currentAngle; i <= targetAngle; i++) {
+      servo[servoID].write(i);
+      delay(5);
     }
-  }
+  } else if (currentAngle > targetAngle) {
+    for (int i = currentAngle; i >= targetAngle; i--) {
+      servo[servoID].write(i);
+      delay(5);
+    }
+  } 
 }
 void motors::kitRight(uint8_t n) {
-  uint16_t dt = 600;
   for (uint8_t i = 0; i < n; i++) {
-    writeServo(servoPosLeft);
-    writeServo(servoPosRight);
-    writeServo(170);
-    writeServo(servoPosRight);
-    writeServo(90);
+    writeServo(servoPosRight, servosID::kRight);
+    delay(50);
+    writeServo(servoPosLeft, servosID::kRight);
   }
 }
 void motors::reloadKits() {
-  writeServo(servoPosLeft);
-  writeServo(servoPosRight);
-  writeServo(90);
+  writeServo(servoPosLeft, servosID::kLeft);
+  writeServo(servoPosRight, servosID::kRight);
 }
 
 void motors::wait(unsigned long targetTime) {

@@ -97,9 +97,9 @@ private:
   bool limitColition = false;
   bool justRotatedAfterTurn_ = false;
   // servo
-  float servoPos = 90;
-  static constexpr uint16_t servoPosRight = 133;
-  static constexpr uint16_t servoPosLeft = 50;
+  float servoPos = 180;
+  static constexpr uint16_t servoPosRight = 180;
+  static constexpr uint16_t servoPosLeft = 45;
 
 public:
   // objets
@@ -108,7 +108,7 @@ public:
   TCS tcs_;
   LimitSwitch limitSwitch_[2];
   VLX vlx[kNumVlx];
-  Servo servo;
+  Servo servo[2];
   Motor motor[4];
   // Leds leds;
   // public variables
@@ -148,7 +148,7 @@ public:
   void right();
   void rotate(float);
   void moveDistance(uint8_t targetDistance, bool);
-  void writeServo(uint16_t servoAngle);
+  void writeServo(uint16_t servoAngle, uint8_t servoID);
   // setups
   void setupTCS();
   void setupVlx(const uint8_t);
