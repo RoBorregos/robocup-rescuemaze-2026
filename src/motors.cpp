@@ -69,6 +69,7 @@ void motors::setupMotors() {
   setupVlx(vlxID::right);
   setupVlx(vlxID::frontLeft);
   setupVlx(vlxID::back);
+  leds.setupLeds();
   setupTCS();
   servo[servosID::kLeft].attach(Pins::servos[servosID::kLeft]);
   Serial.println("Servo Left attached");
@@ -792,7 +793,6 @@ void motors::ramp() {
       pidEncoders(kSpeedRampDown, true);
     }
     rampState = 2;
-    screenPrint("rampDown");
   }
   if (getAvergeTics() > 1 * kTicsPerTile && rampState == 1) {
     // stop();
@@ -882,39 +882,36 @@ void motors::victimSequency(const char *label) {
   float current = millis();
   while ((millis() - current) < 5100) {
     screenPrint(String(label));
+    leds.setWhite();
     delay(500);
+    leds.turnOff();
     screenPrint(" ");
     delay(500);
+
   }
+  leds.turnOff();
 }
 
 void motors::harmedVictim() {
   victimSequency("HARMED");
   if (kitState == kitID::kRight) {
-    // screenPrint("Right");
     kitRight(2);
   } else if (kitState == kitID::kLeft) {
-    // screenPrint("Left");
     kitLeft(2);
   }
-  // screenPrint("");
 }
 
 void motors::stableVictim() {
-  // screenPrint("Stable");
   victimSequency("STABLE");
   if (kitState == kitID::kRight) {
     kitRight(1);
   } else if (kitState == kitID::kLeft) {
     kitLeft(1);
   }
-  // screenPrint("");
 }
 
 void motors::unharmedVictim() {
-  // screenPrint("Unharmed");
   victimSequency("UNHARMED");
-  // screenPrint("");
 }
 
 void motors::phiVictim() {

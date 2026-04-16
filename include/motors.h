@@ -7,6 +7,7 @@
 #include "VLX.h"
 #include "LimitSwitch.h"
 #include "motor.h"
+#include "Leds.h"
 #include <Arduino.h>
 #include <ESP32Servo.h>
 #include <SPI.h>
@@ -110,7 +111,7 @@ public:
   VLX vlx[kNumVlx];
   Servo servo[2];
   Motor motor[4];
-  // Leds leds;
+  Leds leds;
   // public variables
   bool sameOrientation = false;
   unsigned long buttonTime = millis();

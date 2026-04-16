@@ -83,19 +83,19 @@ void testVlxFrontDistance() {
 void testMotors() {
   int dt = 1000;
   robot.setahead();
-  //delay(dt);
+  delay(dt);
   robot.screenPrint("BackRight");
   robot.motor[MotorID::kBackRight].setSpeed(200);
-  //delay(dt);
+  delay(dt);
   robot.screenPrint("FrontRight");
   robot.motor[MotorID::kFrontRight].setSpeed(200);
-  //delay(dt);
+  delay(dt);
   robot.screenPrint("BackLeft");
   robot.motor[MotorID::kBackLeft].setSpeed(200);
-  //delay(dt);
+  delay(dt);
   robot.screenPrint("FrontLeft");
   robot.motor[MotorID::kFrontLeft].setSpeed(200);
-  //delay(dt);
+  delay(dt);
   // robot.setSpeed(0);
   while (1)
   {
@@ -138,6 +138,34 @@ void testTCS() {
   String print = static_cast<String>(color);
   // robot.screenPrint(print);
   Serial.println(print);
+}
+
+void testVictimSequenceWithLeds() {
+  Serial.println("Test HARMED victim with LEDs");
+  robot.kitState = kitID::kRight;
+  robot.harmedVictim();
+  delay(1000);
+
+  Serial.println("Test STABLE victim with LEDs");
+  robot.kitState = kitID::kLeft;
+  robot.stableVictim();
+  delay(1000);
+
+  Serial.println("Test UNHARMED victim with LEDs");
+  robot.unharmedVictim();
+  delay(1000);
+}
+
+void testKitDropWithLeds() {
+  Serial.println("Test kit drop right");
+  robot.kitState = kitID::kRight;
+  robot.harmedVictim();
+  delay(1000);
+
+  Serial.println("Test kit drop left");
+  robot.kitState = kitID::kLeft;
+  robot.stableVictim();
+  delay(1000);
 }
 
 void testTurn(float angle) { robot.rotate(angle); }
