@@ -8,6 +8,7 @@
 #include <Arduino.h>
 #include <ESP32Servo.h>
 #include <SPI.h>
+#include "LimitSwitch.h"
 
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
@@ -23,10 +24,10 @@ constexpr uint8_t edgeTileDistance = 10;
 constexpr uint8_t kTileLength = 30;
 constexpr uint8_t rulet[4][4] = {
     {0, 1, 2, 3}, {3, 0, 1, 2}, {2, 3, 0, 1}, {1, 2, 3, 0}};
-constexpr uint8_t targetDistances[] = {edgeTileDistance + 1,
-                                       kTileLength + edgeTileDistance + 1};
-constexpr uint8_t targetDistancesB[] = {kTileLength + edgeTileDistance - 1,
-                                        1 * kTileLength + edgeTileDistance - 1};
+constexpr uint8_t targetDistances[] = {edgeTileDistance + 2,
+                                       kTileLength + edgeTileDistance + 2};
+constexpr uint8_t targetDistancesB[] = {kTileLength + edgeTileDistance - 2,
+                                        1 * kTileLength + edgeTileDistance - 2};
 
 class motors {
 private:
@@ -35,13 +36,13 @@ private:
   PID myPID[4];
   // vlx
   static constexpr uint8_t kNumVlx = 8;
-  static constexpr uint8_t maxVlxDistance = 68;
+  static constexpr uint8_t maxVlxDistance = 48;
   static constexpr uint8_t brakingDis = 5;
-  static constexpr uint8_t kDistanceToWall = 12;
+  static constexpr uint8_t kDistanceToWall = 15;
   static constexpr uint8_t kDistanceToObstacle =
       kTileLength + 2; // look over a bit more than a tile
   // wheels
-  static constexpr float wheelDiameter = 7.5;
+  static constexpr float wheelDiameter = 7.53;
   static constexpr float distancePerRev = wheelDiameter * PI;
   static constexpr float kTicsPerRev = 496.0;
   static constexpr float kTicsPerTile = 30 * kTicsPerRev / distancePerRev;
@@ -51,9 +52,9 @@ private:
   uint16_t kMinPwmFormard = 70;
   uint16_t kMaxPwmFormard = 180;
   // Speeds constants
-  static constexpr uint16_t kMinSpeedRotate = 7;
-  static constexpr uint16_t kMaxSpeedRotate = 30;
-  static constexpr uint16_t kMinSpeedFormard = 5;
+  static constexpr uint16_t kMinSpeedRotate = 15;
+  static constexpr uint16_t kMaxSpeedRotate = 40;
+  static constexpr uint16_t kMinSpeedFormard = 10;
   static constexpr uint16_t kMaxSpeedFormard = 40;
   static constexpr uint16_t kSpeedRampUp = 20;
   static constexpr uint16_t kSpeedRampDown = 9;
@@ -88,6 +89,7 @@ private:
   static constexpr char kCheckpointColor = 'C';
   // movement
   bool limitColition = false;
+  bool BothLimits = false;
   // servo
   float servoPos = 90;
   static constexpr uint16_t servoPosRight = 133;
@@ -98,7 +100,7 @@ public:
   Adafruit_VL53L0X lox = Adafruit_VL53L0X();
   BNO bno;
   TCS tcs_;
-  // LimitSwitch limitSwitch_[2];
+  LimitSwitch limitSwitch_[2];
   VLX vlx[kNumVlx];
   Servo servo;
   Motor motor[4];

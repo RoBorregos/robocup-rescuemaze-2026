@@ -24,7 +24,6 @@ void motors::setupMotors() {
   Wire.begin();
   delay(10);
   Wire.setClock(400000);
-  bno.setupBNO();
   setupVlx(vlxID::left);
   setupVlx(vlxID::frontRight);
   setupVlx(vlxID::right);
@@ -38,8 +37,11 @@ void motors::setupMotors() {
   }
   rampUpPID.changeConstants(kP_RampUp, kI_RampUp, kD_RampUp, rampTime);
   rampDownPID.changeConstants(kP_RampDown, kI_RampDown, kD_RampDown, rampTime);
+  limitSwitch_[LimitSwitchID::kLeft].initLimitSwitch(Pins::limitSwitchPins[LimitSwitchID::kLeft]);
+  limitSwitch_[LimitSwitchID::kRight].initLimitSwitch(Pins::limitSwitchPins[LimitSwitchID::kRight]);
   targetAngle = 0;
   delay(500);
+  bno.setupBNO();
 }
 
 void motors::printAngle() {
@@ -86,11 +88,12 @@ void motors::PID_AllWheels(int targetSpeed) {
 
 void motors::pidEncoders(int speedReference, bool ahead) {
   bno.getOrientationX();
-  static PID pidBno(0.5, 0.1, 0.01, 1);
+  //static PID pidBno(0.78, 0.00, 0.3, 1);
+  static PID pidBno(1.458, 0.025, 0.168, 12);
   if (rampState != 0) changeAngle = 0;
   float AngleError = pidBno.calculate_PID(
       targetAngle + changeAngle, (targetAngle == 0 ? z_rotation : angle));
-  AngleError = constrain(AngleError, -17, 17);
+  AngleError = constrain(AngleError, -18, 18);
   if (!ahead) AngleError = -AngleError;
   PID_Wheel(speedReference + AngleError, MotorID::kFrontLeft);
   PID_Wheel(speedReference + AngleError, MotorID::kBackLeft);
@@ -129,7 +132,7 @@ void motors::ahead() {
     }
   }
 
-  if (frontDistance > 800) rampCaution = true;
+  //if (frontDistance > 800) rampCaution = true;
   if (abs(bno.getOrientationY()) > 15) { encoder = true; offset = kTicsPerTile / 6; }
 
   unsigned long tStart = millis(); // FIX 5: referencia de tiempo para timeout
@@ -141,7 +144,7 @@ void motors::ahead() {
                     : (distance <= targetDistance)) {
       // FIX 5: salida por timeout
       if ((millis() - tStart) > kAheadTimeoutMs) { stop(); resetTics(); return; }
-
+      limitCrash();
       setahead();
       if (blackTile)  break;
       if (buttonPressed) break;
@@ -192,7 +195,8 @@ void motors::ahead() {
     while (getAvergeTics() < kTicsPerTile - offset) {
       // FIX 5: salida por timeout
       if ((millis() - tStart) > kAheadTimeoutMs) { stop(); resetTics(); return; }
-
+      limitCrash();
+      if (BothLimits) { stop(); return; }
       setahead();
       if (blackTile)    return;
       if (buttonPressed) break;
@@ -256,7 +260,9 @@ void motors::passObstacle() {
   bool rightBlocked = vlx[vlxID::frontRight].getDistance() < kDistanceToObstacle;
   if (!leftBlocked && !rightBlocked) return;
   if (leftBlocked  && rightBlocked)  return;
-  moveDistance(kTileLength / 5, false);
+  if(!vlx[vlxID::back].isWall()) {
+    moveDistance(kTileLength / 5, false);
+  }
   limitColition = true;
   if (leftBlocked || rightBlocked) {
     float sideAngle = targetAngle + (leftBlocked ? 25 : -25);
@@ -368,6 +374,40 @@ float motors::changeSpeedMove(bool encoders, bool rotate, int targetDistance, bo
       return speed;
     }
   }
+}
+
+void motors::limitCrash() {
+  if (slope) return;
+  float targetAngle_ = targetAngle;
+  bool leftState = limitSwitch_[LimitSwitchID::kLeft].getState();
+  bool rightState = limitSwitch_[LimitSwitchID::kRight].getState();
+
+    if (!leftState && !rightState) return;
+    delay(50);
+    if(leftState && rightState) {
+      BothLimits = true;
+      stop();
+      resetTics();
+      return;
+    }
+
+    if (rampState != 0) {
+      if (leftState || rightState) limitColition = true;
+      return;
+    }
+
+    moveDistance(kTileLength / 5, false);
+
+    float sideAngle = targetAngle + (leftState ? 25 : -25);
+    if (sideAngle >= 360) sideAngle -= 360;
+    if (sideAngle < 0) sideAngle += 360;
+    rotate(sideAngle);
+    moveDistance(3 * kTileLength / 10, true);
+
+    rotate(targetAngle_);
+    limitColition = false;
+    resetTics();
+    setahead();
 }
 
 void motors::setSpeed(uint16_t speed) {
