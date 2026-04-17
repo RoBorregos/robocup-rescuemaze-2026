@@ -1,43 +1,40 @@
 #include "BNO.H"
+
 float z_rotation;
 float angle;
 
 BNO::BNO() {
   this->event_ = {0};
-  this->bno_ = Adafruit_BNO055(sensorID, I2CAddress, &Wire);
+  this->bno_   = Adafruit_BNO055(sensorID, I2CAddress, &Wire);
 }
-void BNO::setupBNO() {
-  adafruit_bno055_opmode_t mode = OPERATION_MODE_IMUPLUS;
 
+void BNO::setupBNO() {
   if (!bno_.begin()) {
     Serial.println("Error initializing BNO055! Check your connections.");
-    while (1)
-      ;
+    while (1);
   }
   delay(1000);
   bno_.setExtCrystalUse(true);
   Serial.println("BNO055 initialized successfully");
 }
 
-void BNO::updateBNO(sensors_event_t &event) { bno_.getEvent(&event); }
+void BNO::updateBNO(sensors_event_t &event) {
+  bno_.getEvent(&event);
+}
 
 float BNO::getOrientationX() {
   updateBNO(event_);
   angle = event_.orientation.x - phaseCorrection_;
-  if (angle < 0) {
-    angle += 360;
-  } else if (angle >= 360) {
-    angle -= 360;
-  }
-  if (angle > 180) {
-    z_rotation = angle - 360.0;
-  } else {
-    z_rotation = angle;
-  }
+  if (angle < 0)     angle += 360;
+  else if (angle >= 360) angle -= 360;
+  z_rotation = (angle > 180) ? (angle - 360.0f) : angle;
   return angle;
 }
 
 float BNO::getOrientationY() {
+  // FIX 7: una sola lectura del sensor por llamada
+  // Antes llamaba updateBNO dos veces (una aquí y otra heredada del patrón),
+  // lo que causaba dos lecturas I2C en el mismo ciclo con valores distintos.
   updateBNO(event_);
   return event_.orientation.z - phaseCorrectionY_;
 }
@@ -62,7 +59,7 @@ void BNO::resetOrientation() {
 
 void BNO::resetOrientationX() {
   updateBNO(event_);
-  setPhaseCorrection(event_.orientation.x); // Reset the X axis
+  setPhaseCorrection(event_.orientation.x);
   bno_.begin();
   delay(10);
   bno_.setExtCrystalUse(true);
