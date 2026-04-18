@@ -9,15 +9,16 @@ void setup() {
   Serial.begin(115200);
   robot.setupMotors();
 
-  robot.screenBegin();
+  //robot.screenBegin();
   robot.screenPrint("INIT");
   Serial.println("=== RoboCup Rescue Maze ===");
   Serial.println("Connecting to Raspberry Pi...");
-  raspy.connect();
+  //raspy.connect();
   robot.screenPrint("READY");
   Serial.println("Connected. getDetection() ready.");
 
-  pinMode(Pins::checkpointPin, INPUT_PULLDOWN);
+   //robot.bno.setupBNO(); 
+  //pinMode(Pins::checkpointPin, INPUT_PULLDOWN);
   attachInterrupt(digitalPinToInterrupt(Pins::encoder[MotorID::kFrontLeft]),
                   Interrups::frontLeftEncoder, RISING);
   attachInterrupt(digitalPinToInterrupt(Pins::encoder[MotorID::kFrontRight]),
@@ -28,4 +29,10 @@ void setup() {
                   Interrups::backRightEncoder, RISING);
 }
 
-void loop() { m.run_algs(); }
+void loop() { 
+ //testVictimSequenceWithLeds();
+ //estTCS();
+ //robot.screenPrint(String(robot.bno.getOrientationY()));
+ m.run_algs(); //testTCS();
+//raspy.getDetection(); 
+}

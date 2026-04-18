@@ -43,14 +43,17 @@ void Raspy::writeSerial(uint8_t camera_id, uint8_t victim_id) {
 bool Raspy::getDetectionFromCamera(uint8_t camera_id) {
   packet_received = false;
   sendRequest(camera_id);
+  Serial.println("[RASPY] Request sent for camera: " + String(camera_id));
 
   uint32_t start_time = millis();
   while ((millis() - start_time) < waitingTime) {
     if (readSerial()) {
+      Serial.println("[RASPY] Packet received! Victim: " + String(victim) + " Camera: " + String(camera));
       return true;
     }
     delay(1);
   }
+  Serial.println("[RASPY] TIMEOUT waiting for camera " + String(camera_id) + " - no valid packet received");
   return false;
 }
 
@@ -59,6 +62,7 @@ uint8_t Raspy::getDetection() {
   victim = VICTIM_NONE;
   left_victim = VICTIM_NONE;
   right_victim = VICTIM_NONE;
+  robot.kitState = 0;
   int min_consensus_required = DETECTION_MIN_CONSENSUS;
   if (min_consensus_required > DETECTION_ATTEMPTS) {
     min_consensus_required = DETECTION_ATTEMPTS;
@@ -125,11 +129,13 @@ uint8_t Raspy::getDetection() {
   if (left_victim != VICTIM_NONE) {
     victim = left_victim;
     camera = CAM_LEFT;
+    robot.kitState = kitID::kRight;
     return left_victim;
   }
   if (right_victim != VICTIM_NONE) {
     victim = right_victim;
     camera = CAM_RIGHT;
+    robot.kitState = kitID::kRight;
     return right_victim;
   }
 
@@ -140,24 +146,31 @@ uint8_t Raspy::getDetection() {
 uint8_t Raspy::getVictim() const { return victim; }
 
 void Raspy::handlePacket(uint8_t len, const uint8_t *payload) {
+  Serial.println("[RASPY] handlePacket called. Len: " + String(len));
   if (len != UART_PACKET_LEN) {
+    Serial.println("[RASPY ERROR] Invalid packet size. Expected " + String(UART_PACKET_LEN) + " got " + String(len));
     return; // Invalid packet size
   }
 
   uint8_t cam_id = payload[0];
   uint8_t protocol_victim_id = payload[1];
 
+  Serial.println("[RASPY] Cam ID: " + String(cam_id) + " Protocol Victim ID: " + String(protocol_victim_id));
+
   // Validate camera ID
   if (cam_id != CAM_RIGHT && cam_id != CAM_LEFT) {
+    Serial.println("[RASPY ERROR] Invalid camera ID: " + String(cam_id));
     return;
   }
 
   // Validate victim ID
   if (protocol_victim_id > PROTO_VICTIM_MAX_ID) {
+    Serial.println("[RASPY ERROR] Invalid victim ID: " + String(protocol_victim_id));
     return;
   }
 
   uint8_t victim_id = mapProtocolVictimToInternal(protocol_victim_id);
+  Serial.println("[RASPY] Mapped internal victim ID: " + String(victim_id));
 
   // Store detection data
   camera = cam_id;
@@ -268,8 +281,13 @@ void Raspy::parseIncomingByte(uint8_t b) {
 }
 
 bool Raspy::readSerial() {
+  if (Serial.available() > 0) {
+    Serial.println("[RASPY] Available bytes: " + String(Serial.available()));
+  }
   while (Serial.available() > 0) {
     uint8_t byte = (uint8_t)Serial.read();
+    Serial.print("[RASPY RX] 0x");
+    Serial.println(byte, HEX);
     parseIncomingByte(byte);
 
     if (packet_received) {

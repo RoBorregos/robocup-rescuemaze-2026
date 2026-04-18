@@ -24,4 +24,5 @@ void pidTest();
 void calibrateColors();
 void testTCS();
 void testTurn(float angle);
+void testVictimSequenceWithLeds();
 #endif

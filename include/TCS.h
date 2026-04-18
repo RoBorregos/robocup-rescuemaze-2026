@@ -43,19 +43,19 @@ private:
 
   static constexpr int8_t millisToWait_ = 20;
   // BLUE TILE
-  static constexpr float kRedValueInBlue_ = 62;
-  static constexpr float kGreenValueInBlue_ = 72;
-  static constexpr float kBlueValueInBlue_ = 82;
+  static constexpr float kRedValueInBlue_ = 211;
+  static constexpr float kGreenValueInBlue_ = 770;
+  static constexpr float kBlueValueInBlue_ = 1190;
   // BLACK TILE
-  static constexpr float kRedValueInBlack_ = 32.00;
-  static constexpr float kGreenValueInBlack_ = 25.00;
-  static constexpr float kBlueValueInBlack_ = 18.00;
+  static constexpr float kRedValueInBlack_ = 70.00;
+  static constexpr float kGreenValueInBlack_ = 90.00;
+  static constexpr float kBlueValueInBlack_ = 90.00;
   // CHECKPOINT TILE
   static constexpr float kRedValueInCheckpoint_ = 1540.00;
   static constexpr float kGreenValueInCheckpoint_ = 1354.00;
   static constexpr float kBlueValueInCheckpoint_ = 1272.00;
 
-  static constexpr uint8_t rgbThreshold = 20;
+  static constexpr uint8_t rgbThreshold = 200;
   static constexpr float kMinRedValueInBlue_ = kRedValueInBlue_ - rgbThreshold;
   static constexpr float kMaxRedValueInBlue_ = kRedValueInBlue_ + rgbThreshold;
 

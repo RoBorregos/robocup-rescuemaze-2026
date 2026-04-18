@@ -9,6 +9,7 @@
 #include <ESP32Servo.h>
 #include <SPI.h>
 #include "LimitSwitch.h"
+#include "Leds.h"
 
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
@@ -20,8 +21,8 @@
 #define PCA9548A_ADDR 0x70      // PCA9548A Direction
 #define PCA9548A_CHANNEL_4 0x20 // Canal 4 (SDA4/SCL4)
 
-constexpr uint8_t edgeTileDistance = 10;
-constexpr uint8_t kTileLength = 30;
+constexpr uint8_t edgeTileDistance = 6;
+constexpr uint8_t kTileLength = 28;
 constexpr uint8_t rulet[4][4] = {
     {0, 1, 2, 3}, {3, 0, 1, 2}, {2, 3, 0, 1}, {1, 2, 3, 0}};
 constexpr uint8_t targetDistances[] = {edgeTileDistance + 2,
@@ -40,23 +41,24 @@ private:
   static constexpr uint8_t brakingDis = 5;
   static constexpr uint8_t kDistanceToWall = 15;
   static constexpr uint8_t kDistanceToObstacle =
-      kTileLength + 2; // look over a bit more than a tile
+     2 * edgeTileDistance; // look over a bit more than a tile
   // wheels
-  static constexpr float wheelDiameter = 7.53;
+  static constexpr float wheelDiameter = 7.5;
   static constexpr float distancePerRev = wheelDiameter * PI;
   static constexpr float kTicsPerRev = 496.0;
-  static constexpr float kTicsPerTile = 30 * kTicsPerRev / distancePerRev;
+  static constexpr float kTicsPerTile = (kTileLength + edgeTileDistance) * kTicsPerRev / distancePerRev;
   // Pwm constants
   uint16_t kMinPwmRotate = 70;
   uint16_t kMaxPwmRotate = 160;
   uint16_t kMinPwmFormard = 70;
   uint16_t kMaxPwmFormard = 180;
+  uint16_t wallError = 0;
   // Speeds constants
   static constexpr uint16_t kMinSpeedRotate = 15;
-  static constexpr uint16_t kMaxSpeedRotate = 40;
-  static constexpr uint16_t kMinSpeedFormard = 10;
-  static constexpr uint16_t kMaxSpeedFormard = 40;
-  static constexpr uint16_t kSpeedRampUp = 20;
+  static constexpr uint16_t kMaxSpeedRotate = 35;
+  static constexpr uint16_t kMinSpeedFormard = 35;
+  static constexpr uint16_t kMaxSpeedFormard = 35;
+  static constexpr uint16_t kSpeedRampUp = 40;
   static constexpr uint16_t kSpeedRampDown = 9;
   // ramp
   PID rampUpPID;
@@ -66,7 +68,7 @@ private:
   // control Walls
   static constexpr float minDisToLateralWall = 6;
   float changeAngle = 0;
-  static constexpr uint8_t maxChangeAngle = 3;
+  static constexpr uint8_t maxChangeAngle = 2;
   // PID movement constants
   static constexpr float kP_mov = 1;
   static constexpr float kI_mov = 0.00;
@@ -78,9 +80,9 @@ private:
   static constexpr float kD_RampDown = 0.03;
   static constexpr uint8_t rampTime = 20;
   // ramp Up constants
-  static constexpr float kP_RampUp = 0.2;
-  static constexpr float kI_RampUp = 0.01;
-  static constexpr float kD_RampUp = 0.1;
+  static constexpr float kP_RampUp = 0.4;
+  static constexpr float kI_RampUp = 0.00;
+  static constexpr float kD_RampUp = 0.0;
   // TCS
   char tileColor;
   static constexpr char kBlueColor = 'B';
@@ -91,9 +93,9 @@ private:
   bool limitColition = false;
   bool BothLimits = false;
   // servo
-  float servoPos = 90;
-  static constexpr uint16_t servoPosRight = 133;
-  static constexpr uint16_t servoPosLeft = 50;
+  float servoPos = 180;
+  static constexpr uint16_t servoPosRight = 180;
+  static constexpr uint16_t servoPosLeft = 45;
 
 public:
   // objets
@@ -102,9 +104,9 @@ public:
   TCS tcs_;
   LimitSwitch limitSwitch_[2];
   VLX vlx[kNumVlx];
-  Servo servo;
+  Servo servo[2];
   Motor motor[4];
-  // Leds leds;
+  Leds leds;
   // public variables
   bool sameOrientation = false;
   unsigned long buttonTime = millis();
@@ -142,7 +144,7 @@ public:
   void right();
   void rotate(float);
   void moveDistance(uint8_t targetDistance, bool);
-  void writeServo(uint16_t servoAngle);
+  void writeServo(uint16_t servoAngle, uint8_t servoID);
   // setups
   void setupTCS();
   void setupVlx(const uint8_t);
@@ -158,6 +160,9 @@ public:
   void harmedVictim();
   void stableVictim();
   void unharmedVictim();
+  void phiVictim();
+  void psiVictim();
+  void omegaVictim();
   void kitRight(uint8_t);
   void kitLeft(uint8_t);
   void reloadKits();

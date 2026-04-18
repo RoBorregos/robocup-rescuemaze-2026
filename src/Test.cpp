@@ -129,3 +129,19 @@ void testTCS() {
 }
 
 void testTurn(float angle) { robot.rotate(angle); }
+
+void testVictimSequenceWithLeds() {
+  Serial.println("Test HARMED victim with LEDs");
+  robot.kitState = kitID::kRight;
+  robot.harmedVictim();
+  delay(1000);
+
+  Serial.println("Test STABLE victim with LEDs");
+  robot.kitState = kitID::kLeft;
+  robot.stableVictim();
+  delay(1000);
+
+  Serial.println("Test UNHARMED victim with LEDs");
+  robot.unharmedVictim();
+  delay(1000);
+}

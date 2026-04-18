@@ -4,8 +4,8 @@
 #include "Arduino.h"
 
 // Camera IDs
-#define CAM_RIGHT 0
-#define CAM_LEFT 1
+#define CAM_RIGHT 1
+#define CAM_LEFT 0
 
 // Victim IDs
 #define VICTIM_NONE 0x00
@@ -79,7 +79,7 @@ public:
   uint8_t victim;
   uint8_t left_victim;
   uint8_t right_victim;
-  uint32_t waitingTime = 300; // 5 seconds waiting for response
+  uint32_t waitingTime = 1000; // 5 seconds waiting for response
 
 private:
   // Packet parsing states
