@@ -5,12 +5,12 @@
 #define PIN Pins::LedsPin
 constexpr uint8_t numPixels=8;
 #define NUMPIXELS numPixels
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+// #include <Adafruit_GFX.h>
+// #include <Adafruit_SSD1306.h>
 
-#define SCREEN_WIDTH 128 // OLED display width, in pixels
-#define SCREEN_HEIGHT 64 // OLED display height, in pixels
-#define USING_SCREEN 1
+// #define SCREEN_WIDTH 128 // OLED display width, in pixels
+// #define SCREEN_HEIGHT 64 // OLED display height, in pixels
+// #define USING_SCREEN 1
 
 class Leds{
 private:
@@ -37,6 +37,6 @@ public:
     void stableVictim();
     void unharmedVictim();
     void setBlue();
-    void screenPrint(String output);
+    // void screenPrint(String output);
 };
 #endif 

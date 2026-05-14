@@ -11,12 +11,12 @@
 #include "LimitSwitch.h"
 #include "Leds.h"
 
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+// #include <Adafruit_GFX.h>
+// #include <Adafruit_SSD1306.h>
 
-#define SCREEN_WIDTH 128 // OLED display width, in pixels
-#define SCREEN_HEIGHT 64 // OLED display height, in pixels
-#define USING_SCREEN 1
+// #define SCREEN_WIDTH 128 // OLED display width, in pixels
+// #define SCREEN_HEIGHT 64 // OLED display height, in pixels
+// #define USING_SCREEN 1
 
 #define PCA9548A_ADDR 0x70      // PCA9548A Direction
 #define PCA9548A_CHANNEL_4 0x20 // Canal 4 (SDA4/SCL4)
@@ -183,8 +183,8 @@ public:
   // comunication
   void wait(unsigned long);
   void wifiPrint(String, float);
-  void screenBegin();
-  void screenPrint(String);
+  // void screenBegin();
+  // void screenPrint(String);
   void printSpeeds();
   void printAngle();
 };

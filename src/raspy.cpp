@@ -123,7 +123,7 @@ uint8_t Raspy::getDetection() {
       (max_count >= min_consensus_required) ? left_consensus : VICTIM_NONE;
 
   // Update display with split screen: LEFT on top, RIGHT on bottom
-  updateDisplaySplitScreen();
+  // updateDisplaySplitScreen();
 
   // Return first valid victim (LEFT priority, then RIGHT)
   if (left_victim != VICTIM_NONE) {
@@ -220,21 +220,21 @@ const char *Raspy::victimIdToName(uint8_t victim_id) {
   }
 }
 
-void Raspy::updateDisplaySplitScreen() {
-  // Split screen: LEFT on top (line 1), RIGHT on bottom (line 2)
-  char line1[DISPLAY_LINE_SIZE];
-  char line2[DISPLAY_LINE_SIZE];
-
-  const char *left_name = victimIdToName(left_victim);
-  const char *right_name = victimIdToName(right_victim);
-
-  snprintf(line1, sizeof(line1), DISPLAY_FORMAT_LEFT, left_name);
-  snprintf(line2, sizeof(line2), DISPLAY_FORMAT_RIGHT, right_name);
-
-  // Combine both lines with newline character
-  String display = String(line1) + String(DISPLAY_SEPARATOR) + String(line2);
-  robot.screenPrint(display);
-}
+// void Raspy::updateDisplaySplitScreen() {
+//   // Split screen: LEFT on top (line 1), RIGHT on bottom (line 2)
+//   char line1[DISPLAY_LINE_SIZE];
+//   char line2[DISPLAY_LINE_SIZE];
+//
+//   const char *left_name = victimIdToName(left_victim);
+//   const char *right_name = victimIdToName(right_victim);
+//
+//   snprintf(line1, sizeof(line1), DISPLAY_FORMAT_LEFT, left_name);
+//   snprintf(line2, sizeof(line2), DISPLAY_FORMAT_RIGHT, right_name);
+//
+//   // Combine both lines with newline character
+//   String display = String(line1) + String(DISPLAY_SEPARATOR) + String(line2);
+//   robot.screenPrint(display);
+// }
 
 void Raspy::parseIncomingByte(uint8_t b) {
   switch (rx_state) {

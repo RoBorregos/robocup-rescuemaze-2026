@@ -16,7 +16,7 @@
 // Descomenta para depurar; déjalo comentado en carrera real
 // #define DEBUG_SERIAL
 
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+// Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 motors::motors() {}
 
@@ -24,19 +24,19 @@ void motors::setupMotors() {
   Wire.begin();
   delay(10);
   Wire.setClock(400000);
-  screenBegin();
+  // screenBegin();
   setupVlx(vlxID::left);
-  screenPrint("Failed VLX " + String(vlxID::left));
+  // screenPrint("Failed VLX " + String(vlxID::left));
   setupVlx(vlxID::frontRight);
-  screenPrint("Failed VLX " + String(vlxID::frontRight));
+  // screenPrint("Failed VLX " + String(vlxID::frontRight));
   setupVlx(vlxID::right);
-  screenPrint("Failed VLX " + String(vlxID::right));
+  // screenPrint("Failed VLX " + String(vlxID::right));
   setupVlx(vlxID::frontLeft);
-  screenPrint("Failed VLX " + String(vlxID::frontLeft));
+  // screenPrint("Failed VLX " + String(vlxID::frontLeft));
   setupVlx(vlxID::back);
-  screenPrint("Failed VLX " + String(vlxID::back));
+  // screenPrint("Failed VLX " + String(vlxID::back));
   setupTCS();
-  screenPrint("Failed TCS");
+  // screenPrint("Failed TCS");
   leds.setupLeds();
   for (uint8_t i = 0; i < 4; i++) {
     motor[i].initialize(Pins::digitalOne[i], Pins::digitalTwo[i],
@@ -55,11 +55,11 @@ void motors::setupMotors() {
   servo[servosID::kLeft].write(servoPosRight);
   servo[servosID::kRight].write(servoPosLeft);
   bno.setupBNO();
-  screenPrint("Failed BNO");
+  // screenPrint("Failed BNO");
   // Zero heading/pitch while robot is flat at boot.
-  bno.resetOrientation();
+  //bno.resetOrientation();
   targetAngle = 0;
-  screenPrint("Failed BNO");
+  // screenPrint("Failed BNO");
 }
 
 void motors::printAngle() {
@@ -197,7 +197,7 @@ void motors::ahead() {
         if ((millis() - tStart) > kAheadTimeoutMs) { stop(); resetTics(); return; }
         setahead();
         inMotion = true;
-        checkTileColor();
+        //checkTileColor();
         if (blackTile)    break;;
         if (buttonPressed) break;
         if (isRamp())     break;
@@ -224,7 +224,7 @@ void motors::ahead() {
       if (BothLimits) { stop(); return; }
       setahead();
       inMotion = true;
-      checkTileColor();
+      //checkTileColor();
       if (blackTile)    return;
       if (buttonPressed) break;
       if (isRamp())     break;
@@ -245,7 +245,7 @@ void motors::ahead() {
   slope = false;
   stop();
   resetTics();
-  checkTileColor();
+  //checkTileColor();
   resetTics();
 }
 
@@ -522,7 +522,7 @@ void motors::setupVlx(const uint8_t index) {
 }
 
 void motors::resetVlx() {
-  screenBegin();
+  // screenBegin();
   setupVlx(vlxID::frontLeft);
   setupVlx(vlxID::left);
   setupVlx(vlxID::frontRight);
@@ -593,7 +593,7 @@ void motors::ramp() {
       pidEncoders(kSpeedRampDown, true);
     }
     rampState = 1;
-    screenPrint("rampUp");
+    // screenPrint("rampUp");
   }
   while (bno.getOrientationY() < -7) {
     if (buttonPressed)    break;
@@ -696,11 +696,11 @@ void motors::unharmedVictim() {
 void motors::victimSequency() {
   float current = millis();
   while ((millis() - current) < 5100) {
-    screenPrint("Victim");
+    // screenPrint("Victim");
     leds.setYellow();
     delay(500);
     leds.turnOff();
-    screenPrint(" ");
+    // screenPrint(" ");
     delay(500);
 
   }
@@ -773,19 +773,19 @@ void motors::setupTCS() {
   bno.setPhaseCorrectionY(bno.getOrientationY());
 }
 
-void motors::screenBegin() {
-  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
-  Serial.println("Screen initialized");
-}
+// void motors::screenBegin() {
+//   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+//   Serial.println("Screen initialized");
+// }
 
-void motors::screenPrint(String output) {
-  display.clearDisplay();
-  display.setTextSize(2);
-  display.setTextColor(WHITE);
-  display.setCursor(0, 10);
-  display.println(output);
-  display.display();
-}
+// void motors::screenPrint(String output) {
+//   display.clearDisplay();
+//   display.setTextSize(2);
+//   display.setTextColor(WHITE);
+//   display.setCursor(0, 10);
+//   display.println(output);
+//   display.display();
+// }
 
 void motors::calibrateColors() {
   uint16_t dt = 10000;

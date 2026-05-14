@@ -48,10 +48,10 @@
 #define DETECTION_ATTEMPT_DELAY_MS 10
 
 // Display constants
-#define DISPLAY_LINE_SIZE 20
-#define DISPLAY_FORMAT_LEFT "L:%s"
-#define DISPLAY_FORMAT_RIGHT "R:%s"
-#define DISPLAY_SEPARATOR "\n"
+// #define DISPLAY_LINE_SIZE 20
+// #define DISPLAY_FORMAT_LEFT "L:%s"
+// #define DISPLAY_FORMAT_RIGHT "R:%s"
+// #define DISPLAY_SEPARATOR "\n"
 
 class Raspy {
 public:
@@ -99,7 +99,7 @@ private:
   void sendRequest(uint8_t camera_id);
   uint8_t mapProtocolVictimToInternal(uint8_t protocol_victim_id);
   const char *victimIdToName(uint8_t victim_id);
-  void updateDisplaySplitScreen();
+  // void updateDisplaySplitScreen();
 };
 
 extern Raspy raspy;

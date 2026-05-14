@@ -10,11 +10,9 @@ void setup() {
   robot.setupMotors();
 
   //robot.screenBegin();
-  robot.screenPrint("INIT");
   Serial.println("=== RoboCup Rescue Maze ===");
   Serial.println("Connecting to Raspberry Pi...");
   //raspy.connect();
-  robot.screenPrint("READY");
   Serial.println("Connected. getDetection() ready.");
 
    //robot.bno.setupBNO(); 
@@ -33,6 +31,7 @@ void loop() {
  //testVictimSequenceWithLeds();
  //estTCS();
  //robot.screenPrint(String(robot.bno.getOrientationY()));
- m.run_algs(); //testTCS();
-//raspy.getDetection(); 
+ //aspy.getDetection(); 
+ //testMotors();
+ m.run_algs();
 }
