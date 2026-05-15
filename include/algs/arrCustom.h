@@ -23,7 +23,7 @@ public:
     if (index < size && index >= 0) {
       positions[index] = value;
     } else {
-      Serial.println("Index out of bounds");
+      //Serial.println("Index out of bounds");
     }
   }
   uint8_t getIndex(T value) {
@@ -39,7 +39,7 @@ public:
     if (index < size && index >= 0) {
       return positions[index];
     } else {
-      Serial.println("Index out of bounds");
+      //Serial.println("Index out of bounds");
       return positions[size - 1]; // o maneja el error de otra manera
     }
   }

@@ -21,8 +21,8 @@
 #define PCA9548A_ADDR 0x70      // PCA9548A Direction
 #define PCA9548A_CHANNEL_4 0x20 // Canal 4 (SDA4/SCL4)
 
-constexpr uint8_t edgeTileDistance = 6;
-constexpr uint8_t kTileLength = 28;
+constexpr uint8_t edgeTileDistance = 8;
+constexpr uint8_t kTileLength = 30;
 constexpr uint8_t rulet[4][4] = {
     {0, 1, 2, 3}, {3, 0, 1, 2}, {2, 3, 0, 1}, {1, 2, 3, 0}};
 constexpr uint8_t targetDistances[] = {edgeTileDistance + 2,
@@ -54,7 +54,7 @@ private:
   uint16_t kMaxPwmFormard = 180;
   uint16_t wallError = 0;
   // Speeds constants
-  static constexpr uint16_t kMinSpeedRotate = 15;
+  static constexpr uint16_t kMinSpeedRotate = 20;
   static constexpr uint16_t kMaxSpeedRotate = 35;
   static constexpr uint16_t kMinSpeedFormard = 35;
   static constexpr uint16_t kMaxSpeedFormard = 35;
@@ -70,9 +70,9 @@ private:
   float changeAngle = 0;
   static constexpr uint8_t maxChangeAngle = 2;
   // PID movement constants
-  static constexpr float kP_mov = 1;
-  static constexpr float kI_mov = 0.00;
-  static constexpr float kD_mov = 1.35;
+  static constexpr float kP_mov = 1.05;
+  static constexpr float kI_mov = 0.001;
+  static constexpr float kD_mov = 0;
   static constexpr uint8_t movTime = 20;
   // ramp down constants
   static constexpr float kP_RampDown = 0.15;

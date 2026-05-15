@@ -95,6 +95,11 @@ void motors::PID_Wheel(int targetSpeed, int i) {
   float error = myPID[i].calculate_PID(speed_setpoint, speedTics);
   int speed   = reference_pwm + error;
   speed       = constrain(speed, 0, 255);
+  Serial.print("W"); Serial.print(i);
+  Serial.print(" target="); Serial.print(targetSpeed);
+  Serial.print(" tics=");   Serial.print(speedTics);
+  Serial.print(" err=");    Serial.print(error);
+  Serial.print(" pwm=");    Serial.println(motor[i].getSpeed());
   motor[i].setSpeed(speed);
 }
 
@@ -107,16 +112,16 @@ void motors::PID_AllWheels(int targetSpeed) {
 void motors::pidEncoders(int speedReference, bool ahead) {
   bno.getOrientationX();
   //static PID pidBno(0.78, 0.00, 0.3, 1);
-  static PID pidBno(1.458, 0.025, 0.17, 12); //1.458 0.025 0.168
+  static PID pidBno(1.5, 0.015, 0.25, 12);//1.458 0.025 0.168
   if (rampState != 0) changeAngle = 0;
   float AngleError = pidBno.calculate_PID(
       targetAngle + changeAngle, (targetAngle == 0 ? z_rotation : angle));
-  AngleError = constrain(AngleError, -18, 18);
+  AngleError = constrain(AngleError, -20, 20);
   if (!ahead) AngleError = -AngleError;
-  PID_Wheel(speedReference + AngleError + wallError, MotorID::kFrontLeft);
-  PID_Wheel(speedReference + AngleError + wallError, MotorID::kBackLeft);
   PID_Wheel(speedReference - AngleError + wallError, MotorID::kFrontRight);
+  PID_Wheel(speedReference + AngleError + wallError, MotorID::kFrontLeft);
   PID_Wheel(speedReference - AngleError + wallError, MotorID::kBackRight);
+  PID_Wheel(speedReference + AngleError + wallError, MotorID::kBackLeft);
 }
 
 // FIX 5: timeout máximo en ahead() — si los encoders fallan no se queda colgado
@@ -179,7 +184,7 @@ void motors::ahead() {
       }
 
       float missingDistance = abs(distance - targetDistance);
-      float speed = map(missingDistance, kTileLength, 0, kMaxSpeedFormard, kMinSpeedFormard);
+      float speed = kMaxSpeedFormard;
 
       if (slope) {
         missingDistance = kTileLength - (getAvergeTics() * kTileLength / kTicsPerTile);
@@ -230,7 +235,7 @@ void motors::ahead() {
       if (isRamp())     break;
 
       float missingDistance = kTileLength - (getAvergeTics() * kTileLength / kTicsPerTile);
-      float speed = map(missingDistance, kTileLength, 0, kMaxSpeedFormard, kMinSpeedFormard);
+      float speed = kMaxSpeedFormard;
       speed = constrain(speed, kMinSpeedFormard, kMaxSpeedFormard);
       if (rampCaution)
         speed = map(missingDistance, kTileLength, 0, kMaxSpeedFormard / 3, kMinSpeedFormard);
@@ -294,17 +299,27 @@ void motors::passObstacle() {
   bool rightBlocked = vlx[vlxID::frontRight].getDistance() < kDistanceToObstacle;
   if (!leftBlocked && !rightBlocked) return;
   if (leftBlocked  && rightBlocked)  return;
-  if(!vlx[vlxID::back].getDistance()  > 10) {
-    moveDistance(kTileLength / 5, false);
-  }
   limitColition = true;
-  if (leftBlocked || rightBlocked) {
-    float sideAngle = targetAngle + (leftBlocked ? 30 : -30);
-    if (sideAngle >= 360) sideAngle -= 360;
-    if (sideAngle <  0)   sideAngle += 360;
-    rotate(sideAngle);
-    moveDistance(3 * kTileLength / 10, true);
+  float sideAngle = targetAngle + (leftBlocked ? -25 : +25);
+  if (sideAngle >= 360) sideAngle -= 360;
+  if (sideAngle <  0)   sideAngle += 360;
+  rotate(sideAngle);
+  float initialBack = vlx[vlxID::back].getDistance();
+  float distance    = 7.0f;
+  resetTics();
+  setback();
+  while (getCurrentDistanceCm() < distance) {
+    if (vlx[vlxID::back].getDistance() < 2) {
+        stop();
+        distance = initialBack - vlx[vlxID::back].getDistance();
+        break;
+      }
+    pidEncoders((kMinSpeedFormard + kMaxSpeedFormard) / 2, false);
   }
+  stop();
+  float sideAngleRad = sideAngle * PI / 180.0f;
+  rotate(targetAngle_);
+  moveDistance(distance * cos(sideAngleRad), true);
   rotate(targetAngle_);
   limitColition = false;
 }

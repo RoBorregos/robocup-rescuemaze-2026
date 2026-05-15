@@ -10,6 +10,7 @@ private:
   float last_time;
   float integral_sum;          // FIX 1: acumulador separado para anti-windup
   float integral_limit;        // FIX 1: límite del integral
+  float last_output;
 
 public:
   PID(float, float, float, float);

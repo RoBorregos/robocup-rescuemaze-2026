@@ -41,29 +41,35 @@ void PID::resetIntegral() {
  
 double PID::calculate_PID(float setpoint, float input) {
   float current_time = millis();
+
+  if (last_time == 0.0f) {
+    last_time = current_time;
+    return 0.0f;
+  }
+
   float delta_time   = current_time - last_time;
  
   // FIX 1: proteger contra delta_time = 0 (evita división por cero en derivativo)
-  if (delta_time < 1.0f) return 0;
+  if (delta_time < 1.0f) return last_output;
  
   if (delta_time >= calculate_time) {
     float error        = setpoint - input;
     float proportional = kp * error;
-    float derivative   = kd * (error - last_error) / delta_time;
+    float derivative   = kd * (error - last_error) / calculate_time;
  
     // FIX 1: integral separado con anti-windup por clamping
     // Solo acumula si el output no está saturado (evita windup al atascarse)
     integral_sum += error * delta_time;
     // Clamp del acumulador
-    if (integral_sum >  integral_limit) integral_sum =  integral_limit;
-    if (integral_sum < -integral_limit) integral_sum = -integral_limit;
+    integral_sum  = constrain(integral_sum, -integral_limit, integral_limit);
  
     float integral = ki * integral_sum;
     float output   = proportional + integral + derivative;
  
     last_error = error;
     last_time  = current_time;
+    last_output = output;
     return output;
   }
-  return 0;
+  return last_output;
 }
