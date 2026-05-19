@@ -43,6 +43,8 @@ void motors::setupMotors() {
                         Pins::pwmPin[i], i);
     myPID[i].changeConstants(kP_mov, kI_mov, kD_mov, movTime);
   }
+  BackLeftPID.changeConstants(1.07, kI_mov, kD_mov, movTime);
+  frontLeftPID.changeConstants(1.06, kI_mov, kD_mov, movTime);
   rampUpPID.changeConstants(kP_RampUp, kI_RampUp, kD_RampUp, rampTime);
   rampDownPID.changeConstants(kP_RampDown, kI_RampDown, kD_RampDown, rampTime);
   limitSwitch_[LimitSwitchID::kLeft].initLimitSwitch(Pins::limitSwitchPins[LimitSwitchID::kLeft]);
@@ -57,7 +59,8 @@ void motors::setupMotors() {
   bno.setupBNO();
   // screenPrint("Failed BNO");
   // Zero heading/pitch while robot is flat at boot.
-  //bno.resetOrientation();
+  bno.resetOrientation();
+  delay(100);
   targetAngle = 0;
   // screenPrint("Failed BNO");
 }
@@ -95,11 +98,11 @@ void motors::PID_Wheel(int targetSpeed, int i) {
   float error = myPID[i].calculate_PID(speed_setpoint, speedTics);
   int speed   = reference_pwm + error;
   speed       = constrain(speed, 0, 255);
-  Serial.print("W"); Serial.print(i);
+  /*Serial.print("W"); Serial.print(i);
   Serial.print(" target="); Serial.print(targetSpeed);
   Serial.print(" tics=");   Serial.print(speedTics);
   Serial.print(" err=");    Serial.print(error);
-  Serial.print(" pwm=");    Serial.println(motor[i].getSpeed());
+  */Serial.print(" pwm=");    Serial.println(motor[i].getSpeed());
   motor[i].setSpeed(speed);
 }
 
@@ -116,12 +119,12 @@ void motors::pidEncoders(int speedReference, bool ahead) {
   if (rampState != 0) changeAngle = 0;
   float AngleError = pidBno.calculate_PID(
       targetAngle + changeAngle, (targetAngle == 0 ? z_rotation : angle));
-  AngleError = constrain(AngleError, -20, 20);
+  AngleError = constrain(AngleError, -10, 10);
   if (!ahead) AngleError = -AngleError;
-  PID_Wheel(speedReference - AngleError + wallError, MotorID::kFrontRight);
-  PID_Wheel(speedReference + AngleError + wallError, MotorID::kFrontLeft);
-  PID_Wheel(speedReference - AngleError + wallError, MotorID::kBackRight);
-  PID_Wheel(speedReference + AngleError + wallError, MotorID::kBackLeft);
+  motor[MotorID::kFrontRight].setSpeed(speedReference + AngleError);
+  motor[MotorID::kFrontLeft].setSpeed(speedReference - AngleError);
+  motor[MotorID::kBackRight].setSpeed(speedReference - AngleError);
+  motor[MotorID::kBackLeft].setSpeed(speedReference + AngleError);
 }
 
 // FIX 5: timeout máximo en ahead() — si los encoders fallan no se queda colgado
@@ -176,12 +179,19 @@ void motors::ahead() {
       distance = (frontVlx
                   ? max(vlx[vlxID::frontLeft].getDistance(), vlx[vlxID::frontRight].getDistance())
                   : vlx[vlxID::back].getDistance());
-
-      // Si VLX sale del rango util en movimiento, continuar por encoder.
+        Serial.print("Target: "); Serial.print(targetDistance);
+        Serial.print("Distance: "); Serial.println(distance);
       if (distance < 1 || distance > maxVlxDistance) {
         encoder = true;
         break;
       }
+
+      if (vlx[vlxID::frontLeft].getDistance() < brakingDis ||
+        vlx[vlxID::frontRight].getDistance() < brakingDis) {
+      stop();
+      resetTics();
+      return;
+  }
 
       float missingDistance = abs(distance - targetDistance);
       float speed = kMaxSpeedFormard;
@@ -396,6 +406,8 @@ void motors::rotate(float deltaAngle) {
     changeSpeedMove(false, true, 0, false);
     bno.getOrientationX();
     currentAngle = hexadecimal ? angle : z_rotation;
+    Serial.print("Target: "); Serial.print(targetAngle);
+    Serial.print(" Angle: "); Serial.println(currentAngle);
     if (buttonPressed) break;
   }
   stop();
@@ -444,17 +456,29 @@ void motors::limitCrash() {
       if (leftState || rightState) limitColition = true;
       return;
     }
-
-    moveDistance(kTileLength / 5, false);
-
-    float sideAngle = targetAngle + (leftState ? 30 : -30);
-    if (sideAngle >= 360) sideAngle -= 360;
-    if (sideAngle < 0) sideAngle += 360;
-    rotate(sideAngle);
-    moveDistance(3 * kTileLength / 10, true);
-
-    rotate(targetAngle_);
-    limitColition = false;
+limitColition = true;
+  float sideAngle = targetAngle + (leftState ? -25 : +25);
+  if (sideAngle >= 360) sideAngle -= 360;
+  if (sideAngle <  0)   sideAngle += 360;
+  rotate(sideAngle);
+  float initialBack = vlx[vlxID::back].getDistance();
+  float distance    = 7.0f;
+  resetTics();
+  setback();
+  while (getCurrentDistanceCm() < distance) {
+    if (vlx[vlxID::back].getDistance() < 2) {
+        stop();
+        distance = initialBack - vlx[vlxID::back].getDistance();
+        break;
+      }
+    pidEncoders((kMinSpeedFormard + kMaxSpeedFormard) / 2, false);
+  }
+  stop();
+  float sideAngleRad = sideAngle * PI / 180.0f;
+  rotate(targetAngle_);
+  moveDistance(distance * cos(sideAngleRad), true);
+  rotate(targetAngle_);
+  limitColition = false;
     resetTics();
     setahead();
 }

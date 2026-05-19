@@ -35,10 +35,12 @@ private:
   float targetAngle = 0;
   static constexpr unsigned long delayTime = 350;
   PID myPID[4];
+  PID frontLeftPID;
+  PID BackLeftPID;
   // vlx
   static constexpr uint8_t kNumVlx = 8;
   static constexpr uint8_t maxVlxDistance = 48;
-  static constexpr uint8_t brakingDis = 5;
+  static constexpr uint8_t brakingDis = 6;
   static constexpr uint8_t kDistanceToWall = 15;
   static constexpr uint8_t kDistanceToObstacle =
      2 * edgeTileDistance; // look over a bit more than a tile
@@ -54,10 +56,10 @@ private:
   uint16_t kMaxPwmFormard = 180;
   uint16_t wallError = 0;
   // Speeds constants
-  static constexpr uint16_t kMinSpeedRotate = 20;
+  static constexpr uint16_t kMinSpeedRotate = 12;
   static constexpr uint16_t kMaxSpeedRotate = 35;
-  static constexpr uint16_t kMinSpeedFormard = 35;
-  static constexpr uint16_t kMaxSpeedFormard = 35;
+  static constexpr uint16_t kMinSpeedFormard = 20 + 120;
+  static constexpr uint16_t kMaxSpeedFormard = 30 + 120;
   static constexpr uint16_t kSpeedRampUp = 40;
   static constexpr uint16_t kSpeedRampDown = 9;
   // ramp

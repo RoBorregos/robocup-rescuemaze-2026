@@ -13,8 +13,8 @@ private:
   MUX mux_;
   static constexpr uint8_t kMaxInitAttempts_ = 5;
   // High-precision profile: larger timing budget and larger smoothing window.
-  static constexpr uint32_t kTimingBudget = 50000;
-  static constexpr uint8_t kFilterSize = 5;
+  static constexpr uint32_t kTimingBudget = 33000;
+  static constexpr uint8_t kFilterSize = 2;
   static constexpr uint8_t kTrimSamples = 1;
   static constexpr float kOutOfRangeCm = 819.0f;
   static constexpr uint8_t kMaxInvalidReads = 2;

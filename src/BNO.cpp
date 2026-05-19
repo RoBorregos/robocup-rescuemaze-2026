@@ -1,5 +1,7 @@
 #include "BNO.H"
 
+#define DEBUG_BNO
+
 float z_rotation;
 float angle;
 
@@ -24,10 +26,17 @@ void BNO::updateBNO(sensors_event_t &event) {
 
 float BNO::getOrientationX() {
   updateBNO(event_);
-  angle = event_.orientation.x - phaseCorrection_;
-  if (angle < 0)     angle += 360;
+  float raw = event_.orientation.x;
+  angle = raw - phaseCorrection_;
+  if (angle < 0)      angle += 360;
   else if (angle >= 360) angle -= 360;
   z_rotation = (angle > 180) ? (angle - 360.0f) : angle;
+#ifdef DEBUG_BNO
+  Serial.print("BNO raw: "); Serial.print(raw);
+  Serial.print(" phase: "); Serial.print(phaseCorrection_);
+  Serial.print(" angle: "); Serial.print(angle);
+  Serial.print(" z: "); Serial.println(z_rotation);
+#endif
   return angle;
 }
 
@@ -48,20 +57,26 @@ void BNO::setPhaseCorrectionY(float phaseCorrectionY) {
 }
 
 void BNO::resetOrientation() {
+  delay(100);
   updateBNO(event_);
   setPhaseCorrection(event_.orientation.x);
   setPhaseCorrectionY(event_.orientation.z);
-  bno_.begin();
-  delay(10);
-  bno_.setExtCrystalUse(true);
+#ifdef DEBUG_BNO
+  Serial.print("resetOrientation rawX: "); Serial.print(event_.orientation.x);
+  Serial.print(" rawZ: "); Serial.print(event_.orientation.z);
+  Serial.print(" phaseX: "); Serial.print(phaseCorrection_);
+  Serial.print(" phaseZ: "); Serial.println(phaseCorrectionY_);
+#endif
   Serial.println("Bno values set to 0 for X and z axis.");
 }
 
 void BNO::resetOrientationX() {
+  delay(100);
   updateBNO(event_);
   setPhaseCorrection(event_.orientation.x);
-  bno_.begin();
-  delay(10);
-  bno_.setExtCrystalUse(true);
+#ifdef DEBUG_BNO
+  Serial.print("resetOrientationX rawX: "); Serial.print(event_.orientation.x);
+  Serial.print(" phaseX: "); Serial.println(phaseCorrection_);
+#endif
   Serial.println("Bno values set to 0 for X axis.");
 }
